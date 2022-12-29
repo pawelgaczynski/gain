@@ -1,0 +1,161 @@
+run:
+  timeout: 3m
+
+  modules-download-mode: readonly
+  go: "1.17"
+
+linters-settings:
+  cyclop:
+    max-complexity: 30
+    package-average: 10.0
+  
+  exhaustive:
+    default-signifies-exhaustive: true
+
+  errcheck:
+    check-type-assertions: true
+
+  funlen:
+    lines: 100
+    statements: 50
+
+  gocognit:
+    min-complexity: 30
+
+  gocritic:
+    settings:
+      captLocal:
+        paramsOnly: false
+      underef:
+        skipRecvDeref: false
+
+  gomnd:
+    ignored-functions:
+      - os.Chmod
+      - os.Mkdir
+      - os.MkdirAll
+      - os.OpenFile
+      - os.WriteFile
+      - prometheus.ExponentialBuckets
+      - prometheus.ExponentialBucketsRange
+      - prometheus.LinearBuckets
+      - strconv.FormatFloat
+      - strconv.FormatInt
+      - strconv.FormatUint
+      - strconv.ParseFloat
+      - strconv.ParseInt
+      - strconv.ParseUint
+
+  gomodguard:
+    blocked:
+      modules:
+        - github.com/golang/protobuf:
+            recommendations:
+              - google.golang.org/protobuf
+            reason: "see https://developers.google.com/protocol-buffers/docs/reference/go/faq#modules"
+        - github.com/satori/go.uuid:
+            recommendations:
+              - github.com/google/uuid
+            reason: "satori's package is not maintained"
+        - github.com/gofrs/uuid:
+            recommendations:
+              - github.com/google/uuid
+            reason: "see recommendation from dev-infra team: https://confluence.gtforge.com/x/gQI6Aw"
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+    settings:
+      shadow:
+        strict: true
+
+  nakedret:
+    max-func-lines: 0
+
+  nestif:
+    min-complexity: 8
+
+  nolintlint:
+    allow-no-explanation: [ funlen, gocognit, lll, unused, varcheck ]
+    require-explanation: true
+    require-specific: true
+
+  rowserrcheck:
+    packages:
+      - github.com/jmoiron/sqlx
+
+  tenv:
+    all: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck # Errcheck is a program for checking for unchecked errors in go programs. These unchecked errors can be critical bugs in some cases
+    - gosimple # Linter for Go source code that specializes in simplifying a code
+    - ineffassign # Detects when assignments to existing variables are not used
+    - staticcheck # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
+    - typecheck # Like the front-end of a Go compiler, parses and type-checks Go code
+    - unused # Checks Go code for unused constants, variables, functions and types
+    - asciicheck # Simple linter to check that your code does not contain non-ASCII identifiers
+    - bidichk # Checks for dangerous unicode character sequences
+    - cyclop # checks function and package cyclomatic complexity
+    - dupl # Tool for code clone detection
+    - durationcheck # check for two durations multiplied together
+    - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
+    - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
+    - execinquery # execinquery is a linter about query string checker in Query function which reads your Go src files and warning it finds
+    - exhaustive # check exhaustiveness of enum switch statements
+    - exportloopref # checks for pointers to enclosing loop variables
+    - forbidigo # Forbids identifiers
+    - funlen # Tool for detection of long functions
+    - gochecknoinits # Checks that no init functions are present in Go code
+    - gocognit # Computes and checks the cognitive complexity of functions
+    - goconst # Finds repeated strings that could be replaced by a constant
+    - gocritic # Provides diagnostics that check for bugs, performance and style issues.
+    - gocyclo # Computes and checks the cyclomatic complexity of functions
+    - goimports # In addition to fixing imports, goimports also formats your code in the same style as gofmt.
+    - gomnd # An analyzer to detect magic numbers.
+    - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
+    - gomodguard # Allow and block list linter for direct Go module dependencies. This is different from depguard where there are different block types for example version constraints and module recommendations.
+    - goprintffuncname # Checks that printf-like functions are named with f at the end
+    - gosec # Inspects source code for security problems
+    - lll # Reports long lines
+    - makezero # Finds slice declarations with non-zero initial length
+    - nakedret # Finds naked returns in functions greater than a specified function length
+    - nestif # Reports deeply nested if statements
+    - nilnil # Checks that there is no simultaneous return of nil error and an invalid value.
+    - nonamedreturns # Reports all named returns
+    - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL.
+    - predeclared # find code that shadows one of Go's predeclared identifiers
+    - promlinter # Check Prometheus metrics naming via promlint
+    - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint.
+    - stylecheck # Stylecheck is a replacement for golint
+    - tenv # tenv is analyzer that detects using os.Setenv instead of t.Setenv since Go1.17
+    - testpackage # linter that makes you use a separate _test package
+    - unconvert # Remove unnecessary type conversions
+    - whitespace # Tool for detection of leading and trailing whitespace
+
+issues:
+  max-same-issues: 50
+
+  exclude-rules:
+    - source: "^//\\s*go:generate\\s"
+      linters: [ lll ]
+    - source: "(noinspection|TODO)"
+      linters: [ godot ]
+    - source: "//noinspection"
+      linters: [ gocritic ]
+    - source: "^\\s+if _, ok := err\\.\\([^.]+\\.InternalError\\); ok {"
+      linters: [ errorlint ]
+    - path: "iouring/(completion|opcode|register|setup|submission).go"
+      linters: [ unused ]
+    - path: "_test\\.go"
+      linters:
+        - bodyclose
+        - dupl
+        - funlen
+        - goconst
+        - gosec
+        - noctx
+        - wrapcheck
