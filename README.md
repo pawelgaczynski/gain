@@ -61,7 +61,7 @@ Articles about the project:
 ## Getting Started
 
 
-**See an example: [CLI server example](https://github.com/pawelgaczynski/gain/examples/cli/main.go)**
+**See an example: [CLI server example](https://github.com/pawelgaczynski/gain/blob/main/examples/cli/main.go)**
 
 <br/>
 
