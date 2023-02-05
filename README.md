@@ -187,8 +187,6 @@ Project Link: [https://github.com/pawelgaczynski/gain](https://github.com/pawelg
 
 ## Relevant Articles
 
-Use this space to list resources you find helpful and would like to give credit to. I've included a few of my favorites to kick things off!
-
 * [Lord of the io_uring](https://unixism.net/loti/what_is_io_uring.html)
 * [Ringing in a new asynchronous I/O API](https://lwn.net/Articles/776703/)
 * [The rapid growth of io_uring](https://lwn.net/Articles/810414/)
