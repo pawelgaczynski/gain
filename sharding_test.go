@@ -182,3 +182,11 @@ func TestShardingTCPCloseConnSync(t *testing.T) {
 func TestShardingTCPCloseConnAsync(t *testing.T) {
 	testCloseConn(t, true, gain.SocketSharding)
 }
+
+func TestShardingTCPConnAddress(t *testing.T) {
+	testConnAddress(t, gainNet.TCP, gain.SocketSharding)
+}
+
+func TestShardingUDPConnAddress(t *testing.T) {
+	testConnAddress(t, gainNet.UDP, gain.SocketSharding)
+}

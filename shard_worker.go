@@ -54,6 +54,12 @@ func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
 	conn.fd = fileDescriptor
 	conn.localAddr = w.localAddr
 
+	if clientAddr, err := w.acceptor.lastClientAddr(); err == nil {
+		conn.remoteAddr = clientAddr
+	} else {
+		w.logError(err).Msg("get last client address failed")
+	}
+
 	if w.cpuAffinity {
 		err := unix.SetsockoptInt(fileDescriptor, unix.SOL_SOCKET, unix.SO_INCOMING_CPU, w.index()+1)
 		if err != nil {

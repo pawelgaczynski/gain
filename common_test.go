@@ -189,7 +189,6 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 		gain.WithArchitecture(architecture),
 	}
 
-	opts = append(opts, []gain.ConfigOption{}...)
 	config := gain.NewConfig(opts...)
 
 	testHandler := newTestServerHandler(testConfig.readHandler)

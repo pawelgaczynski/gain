@@ -129,6 +129,7 @@ func (a *acceptorWorker) loop(fd int) error {
 		}
 		var clientAddr net.Addr
 		clientAddr, err = a.lastClientAddr()
+
 		if err != nil {
 			a.logError(err).
 				Int("fd", fd).

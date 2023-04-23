@@ -15,9 +15,13 @@
 package gain_test
 
 import (
+	"crypto/rand"
 	"fmt"
 	"log"
 	"net"
+	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -185,7 +189,6 @@ func newTestConnServer(
 		gain.WithAsyncHandler(async),
 	}
 
-	opts = append(opts, []gain.ConfigOption{}...)
 	config := gain.NewConfig(opts...)
 
 	server := gain.NewServer(eventHandler, config)
@@ -201,4 +204,96 @@ func newTestConnServer(
 	eventHandler.startedWg.Wait()
 
 	return server, int(port)
+}
+
+func getIPAndPort(addr net.Addr) (string, int) {
+	switch addr := addr.(type) {
+	case *net.UDPAddr:
+		return addr.IP.String(), addr.Port
+	case *net.TCPAddr:
+		return addr.IP.String(), addr.Port
+	}
+
+	return "", 0
+}
+
+func testConnAddress(
+	t *testing.T, network string, architecture gain.ServerArchitecture,
+) {
+	t.Helper()
+	numberOfClients := 10
+	opts := []gain.ConfigOption{
+		gain.WithLoggerLevel(zerolog.FatalLevel),
+		gain.WithWorkers(4),
+		gain.WithArchitecture(architecture),
+	}
+
+	config := gain.NewConfig(opts...)
+
+	out, err := exec.Command("bash", "-c", "sysctl net.ipv4.ip_local_port_range | awk '{ print $3; }'").Output()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	lowestEphemeralPort, err := strconv.Atoi(strings.ReplaceAll(string(out), "\n", ""))
+	if err != nil {
+		log.Panic(err)
+	}
+
+	verifyAddresses := func(t *testing.T, conn gain.Conn) {
+		t.Helper()
+		localAddr := conn.LocalAddr()
+		NotNil(t, localAddr)
+
+		ip, port := getIPAndPort(localAddr)
+		Equal(t, "127.0.0.1", ip)
+		Less(t, port, 10000)
+		GreaterOrEqual(t, port, 9000)
+		remoteAddr := conn.RemoteAddr()
+
+		ip, port = getIPAndPort(remoteAddr)
+		NotNil(t, remoteAddr)
+		Equal(t, "127.0.0.1", ip)
+		GreaterOrEqual(t, port, lowestEphemeralPort)
+	}
+
+	var wg sync.WaitGroup
+
+	wg.Add(numberOfClients)
+
+	onReadCallback := func(conn gain.Conn) {
+		buf, _ := conn.Next(-1)
+		_, _ = conn.Write(buf)
+
+		verifyAddresses(t, conn)
+
+		wg.Done()
+	}
+
+	testHandler := newTestServerHandler(onReadCallback)
+
+	server := gain.NewServer(testHandler, config)
+	testPort := getTestPort()
+
+	go func() {
+		serverErr := server.Start(fmt.Sprintf("%s://localhost:%d", network, testPort))
+		if err != nil {
+			log.Panic(serverErr)
+		}
+	}()
+
+	testHandler.startedWg.Wait()
+
+	clientsGroup := newTestConnClientGroup(t, network, testPort, numberOfClients)
+	clientsGroup.Dial()
+
+	data := make([]byte, 1024)
+	_, err = rand.Read(data)
+	Nil(t, err)
+	clientsGroup.Write(data)
+	buffer := make([]byte, 1024)
+	clientsGroup.Read(buffer)
+
+	wg.Wait()
+	server.Close()
 }

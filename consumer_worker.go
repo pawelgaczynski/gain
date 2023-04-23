@@ -17,6 +17,7 @@ package gain
 import (
 	"fmt"
 	"net"
+	"sync"
 	"syscall"
 
 	"github.com/pawelgaczynski/gain/iouring"
@@ -39,13 +40,13 @@ type consumerWorker struct {
 	*readWriteWorkerImpl
 	config consumerConfig
 
-	socketAddresses map[int]net.Addr
+	socketAddresses sync.Map
 	// used for kernels < 5.18 where OP_MSG_RING is not supported
 	connQueue queue.LockFreeQueue[int]
 }
 
 func (c *consumerWorker) setSocketAddr(fd int, addr net.Addr) {
-	c.socketAddresses[fd] = addr
+	c.socketAddresses.Store(fd, addr)
 }
 
 func (c *consumerWorker) addConnToQueue(fd int) error {
@@ -129,6 +130,14 @@ func (c *consumerWorker) getConnsFromQueue() {
 		conn.fd = fd
 		conn.localAddr = c.localAddr
 
+		if remoteAddr, ok := c.socketAddresses.Load(fd); ok {
+			conn.remoteAddr, _ = remoteAddr.(net.Addr)
+
+			c.socketAddresses.Delete(fd)
+		} else {
+			c.logError(gainErrors.ErrorAddressNotFound(fd)).Msg("Get new connection error")
+		}
+
 		err := c.addReadRequest(conn)
 		if err != nil {
 			c.logError(err).Msg("Add read() request for new connection error")
@@ -193,6 +202,13 @@ func (c *consumerWorker) loop(_ int) error {
 			}
 			conn.fd = int(cqe.Res())
 			conn.localAddr = c.localAddr
+			if remoteAddr, ok := c.socketAddresses.Load(conn.fd); ok {
+				conn.remoteAddr, _ = remoteAddr.(net.Addr)
+				c.socketAddresses.Delete(conn.fd)
+			} else {
+				c.logError(gainErrors.ErrorAddressNotFound(conn.fd)).Msg("Get new connection error")
+			}
+
 			err := c.addReadRequest(conn)
 			if err != nil {
 				c.logError(err).Msg("Add read() request for new connection error")
@@ -237,7 +253,6 @@ func newConsumerWorker(
 		readWriteWorkerImpl: newReadWriteWorkerImpl(
 			ring, index, localAddr, eventHandler, connectionManager, config.readWriteWorkerConfig, logger,
 		),
-		socketAddresses: make(map[int]net.Addr),
 	}
 
 	if !features.ringsMessaging {

@@ -108,3 +108,7 @@ func TestReactorTCPCloseConnSync(t *testing.T) {
 func TestReactorTCPCloseConnAsync(t *testing.T) {
 	testCloseConn(t, true, gain.Reactor)
 }
+
+func TestReactorTCPConnAddress(t *testing.T) {
+	testConnAddress(t, gainNet.TCP, gain.Reactor)
+}

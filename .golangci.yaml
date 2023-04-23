@@ -95,6 +95,7 @@ linters-settings:
       - gc
       - wg
       - lb
+      - ip
     ignore-decls:
       - n int
       - n uint32

@@ -52,6 +52,8 @@ var (
 	ErrInvalidTimeDuration = errors.New("invalid time duration")
 	// ErrInvalidState occurs when operation is called in invalid state.
 	ErrInvalidState = errors.New("invalid state")
+	// ErrAddressNotFound occurs when network address of fd could not be found.
+	ErrAddressNotFound = errors.New("address could not be found")
 )
 
 func ErrorConnectionIsMissing(key int) error {
@@ -64,4 +66,8 @@ func ErrorOpNotAvailableInMode(op, mode string) error {
 
 func ErrorUnknownConnectionState(state int) error {
 	return fmt.Errorf("%w, state: %d", ErrUnknownConnectionState, state)
+}
+
+func ErrorAddressNotFound(fd int) error {
+	return fmt.Errorf("%w, fd: %d", ErrAddressNotFound, fd)
 }
