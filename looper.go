@@ -19,6 +19,7 @@ import (
 	"runtime"
 
 	"github.com/pawelgaczynski/gain/iouring"
+	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 )
 
 type eventProcessor func(*iouring.CompletionQueueEvent) error
@@ -26,7 +27,7 @@ type eventProcessor func(*iouring.CompletionQueueEvent) error
 type looper struct {
 	submitter
 	ring            *iouring.Ring
-	lockOSThread    bool
+	cpuAffinity     bool
 	processPriority bool
 	maxCQEvents     int
 	startListener   workerStartListener
@@ -41,29 +42,45 @@ type looper struct {
 func (l *looper) innerLoop(eventProcessor eventProcessor) error {
 	var err error
 	cqes := make([]*iouring.CompletionQueueEvent, l.maxCQEvents)
+
 	for {
 		if continueLoop := l.shutdownHandler(); !continueLoop {
 			return nil
 		}
+
 		if err = l.submit(); err != nil {
-			if errors.Is(err, errSkippable) {
+			if errors.Is(err, gainErrors.ErrSkippable) {
+				if l.loopFinisher != nil {
+					l.loopFinisher()
+				}
+
+				if l.loopFinishCondition != nil && l.loopFinishCondition() {
+					return nil
+				}
+
 				continue
 			}
+
 			return err
 		}
-		n := l.ring.PeekBatchCQE(cqes)
-		for i := 0; i < n; i++ {
+		numberOfCQEs := l.ring.PeekBatchCQE(cqes)
+
+		for i := 0; i < numberOfCQEs; i++ {
 			cqe := cqes[i]
-			err := eventProcessor(cqe)
+
+			err = eventProcessor(cqe)
 			if err != nil {
 				l.advance(uint32(i + 1))
+
 				return err
 			}
 		}
-		l.advance(uint32(n))
+		l.advance(uint32(numberOfCQEs))
+
 		if l.loopFinisher != nil {
 			l.loopFinisher()
 		}
+
 		if l.loopFinishCondition != nil && l.loopFinishCondition() {
 			return nil
 		}
@@ -73,19 +90,22 @@ func (l *looper) innerLoop(eventProcessor eventProcessor) error {
 func (l *looper) startLoop(index int, eventProcessor eventProcessor) error {
 	var err error
 	if l.processPriority {
-		err := setProcessPriority()
+		err = setProcessPriority()
 		if err != nil {
 			return err
 		}
 	}
-	if l.lockOSThread {
-		err := setAffinity(index)
+
+	if l.cpuAffinity {
+		err = setCPUAffinity(index)
 		if err != nil {
 			return err
 		}
+
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
+
 	if l.prepareHandler != nil {
 		err = l.prepareHandler()
 		if err != nil {
@@ -97,6 +117,7 @@ func (l *looper) startLoop(index int, eventProcessor eventProcessor) error {
 		l.running = true
 		l.startListener()
 	}
+
 	return l.innerLoop(eventProcessor)
 }
 
@@ -105,17 +126,12 @@ func (l *looper) started() bool {
 }
 
 func newLooper(
-	ring *iouring.Ring, lockOSThread bool, processPriority bool, maxCQEvents int, batchSubmitter bool) *looper {
-	var submitter submitter
-	if batchSubmitter {
-		submitter = newBatchSubmitter(ring)
-	} else {
-		submitter = newSingleSubmitter(ring)
-	}
+	ring *iouring.Ring, cpuAffinity bool, processPriority bool, maxCQEvents int,
+) *looper {
 	return &looper{
-		submitter:       submitter,
+		submitter:       newBatchSubmitter(ring),
 		ring:            ring,
-		lockOSThread:    lockOSThread,
+		cpuAffinity:     cpuAffinity,
 		processPriority: processPriority,
 		maxCQEvents:     maxCQEvents,
 	}

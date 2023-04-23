@@ -16,10 +16,12 @@ package gain
 
 import (
 	"errors"
+	"fmt"
 	"syscall"
 	"time"
 
 	"github.com/pawelgaczynski/gain/iouring"
+	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 )
 
 var waitForArray = []uint32{
@@ -59,29 +61,40 @@ func (s *batchSubmitter) submit() error {
 			s.waitForIndex--
 			s.waitFor = waitForArray[s.waitForIndex]
 		}
-		return errSkippable
+
+		return gainErrors.ErrSkippable
 	}
-	return err
+
+	if err != nil {
+		return fmt.Errorf("submitAndWaitTimeout error: %w", err)
+	}
+
+	return nil
 }
 
 func (s *batchSubmitter) advance(n uint32) {
 	s.ring.CQAdvance(n)
-	var i uint32
-	var lenWaitForArray = uint32(len(waitForArray))
-	for i = 1; i < lenWaitForArray; i++ {
-		if waitForArray[i] > n {
+
+	var (
+		index           uint32
+		lenWaitForArray = uint32(len(waitForArray))
+	)
+
+	for index = 1; index < lenWaitForArray; index++ {
+		if waitForArray[index] > n {
 			break
 		}
-		s.waitForIndex = i
+		s.waitForIndex = index
 	}
 	s.waitFor = waitForArray[s.waitForIndex]
 }
 
 func newBatchSubmitter(ring *iouring.Ring) *batchSubmitter {
-	s := &batchSubmitter{
+	submitter := &batchSubmitter{
 		ring:            ring,
 		timeoutTimeSpec: syscall.NsecToTimespec((time.Millisecond).Nanoseconds()),
 	}
-	s.waitFor = waitForArray[s.waitForIndex]
-	return s
+	submitter.waitFor = waitForArray[submitter.waitForIndex]
+
+	return submitter
 }

@@ -61,10 +61,8 @@ type SQRingOffsets struct {
 	flags       uint32
 	dropped     uint32
 	array       uint32
-	// nolint: unused
-	resv1 uint32
-	// nolint: unused
-	resv2 uint64
+	resv1       uint32
+	resv2       uint64
 }
 
 type CQRingOffsets struct {
@@ -75,10 +73,8 @@ type CQRingOffsets struct {
 	overflow    uint32
 	cqes        uint32
 	flags       uint32
-	// nolint: unused
-	resv1 uint32
-	// nolint: unused
-	resv2 uint64
+	resv1       uint32
+	resv2       uint64
 }
 
 type Params struct {
@@ -97,52 +93,63 @@ type Params struct {
 
 func (ring *Ring) QueueInitParams(entries uint) error {
 	fd, _, errno := syscall.Syscall(sysSetup, uintptr(entries), uintptr(unsafe.Pointer(ring.params)), 0)
-	fileDescriptor := int(fd)
 	if errno != 0 {
 		return os.NewSyscallError("io_uring_setup", errno)
 	}
+
+	fileDescriptor := int(fd)
+
 	err := ring.mmap(fileDescriptor)
 	if err != nil {
 		return err
 	}
+
 	ring.features = ring.params.features
 	ring.fd = fileDescriptor
 	ring.enterRingFd = fileDescriptor
 	ring.flags = ring.params.flags
+
 	return nil
 }
 
 func (ring *Ring) QueueInit(entries uint, flags uint32) error {
 	ring.params.flags = flags
+
 	return ring.QueueInitParams(entries)
 }
 
 func (ring *Ring) Close() error {
 	if ring.fd != 0 {
-		return syscall.Close(ring.fd)
+		return os.NewSyscallError("close", syscall.Close(ring.fd))
 	}
+
 	return nil
 }
 
 func (ring *Ring) QueueExit() error {
 	ring.exited = true
+
 	err := ring.munmap()
 	if err != nil {
 		return err
 	}
+
 	err = ring.UnmapRings()
 	if err != nil {
 		return err
 	}
+
 	if ring.intFlags&IntFlagRegRing > 0 {
 		_, err = ring.UnregisterRingFd()
 		if err != nil {
 			return err
 		}
 	}
+
 	err = ring.Close()
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

@@ -27,6 +27,7 @@ import (
 func TestSubmitAndWait(t *testing.T) {
 	ring, err := iouring.CreateRing()
 	NoError(t, err)
+
 	defer ring.Close()
 
 	cqeBuff := make([]*iouring.CompletionQueueEvent, 16)
@@ -46,6 +47,7 @@ func TestSubmitAndWait(t *testing.T) {
 func TestSubmitAndWaitNilTimeout(t *testing.T) {
 	ring, err := iouring.CreateRing()
 	NoError(t, err)
+
 	defer ring.Close()
 
 	cqeBuff := make([]*iouring.CompletionQueueEvent, 16)

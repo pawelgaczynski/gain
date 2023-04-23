@@ -25,17 +25,22 @@ import (
 
 func setProcessPriority() error {
 	pid := os.Getpid()
-	return syscall.Setpriority(syscall.PRIO_PROCESS, pid, -19)
+
+	return os.NewSyscallError("setpriority", syscall.Setpriority(syscall.PRIO_PROCESS, pid, -19))
 }
 
-func setAffinity(index int) error {
+func setCPUAffinity(index int) error {
 	var newMask unix.CPUSet
+
 	newMask.Zero()
+
 	cpuIndex := (index) % (runtime.NumCPU())
 	newMask.Set(cpuIndex)
+
 	err := unix.SchedSetaffinity(0, &newMask)
 	if err != nil {
 		return fmt.Errorf("SchedSetaffinity: %w, %v", err, newMask)
 	}
+
 	return nil
 }

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gain
+package stack
 
-type lockFreeQueue[T any] interface {
-	enqueue(T)
-	dequeue() T
-	isEmpty() bool
-	size() int32
+// LockFreeStack is an interface representing a thread-safe, lock-free stack.
+type LockFreeStack[T any] interface {
+	Push(T)
+	Pop() T
 }

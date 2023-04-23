@@ -14,8 +14,10 @@
 
 package iouring
 
-const nSig = 65
-const szDivider = 8
-const registerRingFdOffset = uint32(4294967295)
-const regIOWQMaxWorkersNrArgs = 2
-const defaultMaxQueue = uint(1024)
+const (
+	nSig                    = 65
+	szDivider               = 8
+	registerRingFdOffset    = uint32(4294967295)
+	regIOWQMaxWorkersNrArgs = 2
+	defaultMaxQueue         = uint(1024)
+)

@@ -15,45 +15,67 @@
 package gain
 
 import (
+	"fmt"
+	"net"
+	"syscall"
+	"unsafe"
+
 	"github.com/pawelgaczynski/gain/iouring"
+	"github.com/pawelgaczynski/gain/pkg/errors"
+	"github.com/pawelgaczynski/gain/pkg/socket"
 )
 
 type acceptor struct {
 	ring              *iouring.Ring
-	socket            int
-	clientAddrPointer uintptr
-	clientLenPointer  uint64
-	connectionPool    *connectionPool
+	fd                int
+	clientAddr        *syscall.RawSockaddrAny
+	clientLenPointer  *uint32
+	connectionManager *connectionManager
 }
 
-func (a *acceptor) addAcceptRequest() (*iouring.SubmissionQueueEntry, error) {
+func (a *acceptor) addAcceptRequest() error {
 	entry, err := a.ring.GetSQE()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("error getting SQE: %w", err)
 	}
-	entry.PrepareAccept(int(uintptr(a.socket)), a.clientAddrPointer, a.clientLenPointer, 0)
-	entry.UserData = acceptDataFlag | uint64(a.socket)
-	return entry, err
+
+	entry.PrepareAccept(
+		a.fd, uintptr(unsafe.Pointer(a.clientAddr)), uint64(uintptr(unsafe.Pointer(a.clientLenPointer))), 0)
+	entry.UserData = acceptDataFlag | uint64(a.fd)
+
+	return nil
 }
 
-func (a *acceptor) addAcceptConnRequest() (*iouring.SubmissionQueueEntry, error) {
-	entry, err := a.addAcceptRequest()
+func (a *acceptor) addAcceptConnRequest() error {
+	err := a.addAcceptRequest()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	conn, err := a.connectionPool.get(a.socket)
-	if err != nil {
-		return nil, err
+
+	conn := a.connectionManager.getFd(a.fd)
+	if conn == nil {
+		return errors.ErrConnectionIsMissing
 	}
 	conn.state = connAccept
-	return entry, nil
+
+	return nil
 }
 
-func newAcceptor(ring *iouring.Ring, connectionPool *connectionPool) *acceptor {
-	a := &acceptor{
-		ring:           ring,
-		connectionPool: connectionPool,
+func (a *acceptor) lastClientAddr() (net.Addr, error) {
+	addr, err := anyToSockaddr(a.clientAddr)
+	if err != nil {
+		return nil, err
 	}
-	a.clientAddrPointer, a.clientLenPointer = createClientAddr()
-	return a
+
+	return socket.SockaddrToTCPOrUnixAddr(addr), nil
+}
+
+func newAcceptor(ring *iouring.Ring, connectionManager *connectionManager) *acceptor {
+	acceptor := &acceptor{
+		ring:              ring,
+		connectionManager: connectionManager,
+	}
+	acceptor.clientAddr, acceptor.clientLenPointer = createClientAddr()
+
+	return acceptor
 }

@@ -15,6 +15,7 @@
 package iouring_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pawelgaczynski/gain/iouring"
@@ -23,10 +24,12 @@ import (
 )
 
 func queueNOPs(t *testing.T, ring *iouring.Ring, number int, offset int) error {
+	t.Helper()
+
 	for i := 0; i < number; i++ {
 		entry, err := ring.GetSQE()
 		if err != nil {
-			return err
+			return fmt.Errorf("error getting SQE: %w", err)
 		}
 
 		entry.PrepareNop()
@@ -34,12 +37,14 @@ func queueNOPs(t *testing.T, ring *iouring.Ring, number int, offset int) error {
 	}
 	submitted, err := ring.Submit()
 	Equal(t, int(submitted), number)
+
 	return err
 }
 
 func TestPeekBatchCQE(t *testing.T) {
 	ring, err := iouring.CreateRing()
 	NoError(t, err)
+
 	defer ring.Close()
 
 	cqeBuff := make([]*iouring.CompletionQueueEvent, 16)
@@ -51,6 +56,7 @@ func TestPeekBatchCQE(t *testing.T) {
 
 	cnt = ring.PeekBatchCQE(cqeBuff)
 	Equal(t, 4, cnt)
+
 	for i := 0; i < 4; i++ {
 		assert.Equal(t, uint64(i), cqeBuff[i].UserData())
 	}
@@ -60,6 +66,7 @@ func TestPeekBatchCQE(t *testing.T) {
 	ring.CQAdvance(uint32(4))
 	cnt = ring.PeekBatchCQE(cqeBuff)
 	Equal(t, 4, cnt)
+
 	for i := 0; i < 4; i++ {
 		Equal(t, uint64(i+4), cqeBuff[i].UserData())
 	}

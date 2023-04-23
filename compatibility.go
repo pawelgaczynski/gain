@@ -14,6 +14,6 @@
 
 package gain
 
-type SupportedFeatures struct {
+type supportedFeatures struct {
 	ringsMessaging bool
 }

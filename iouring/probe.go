@@ -41,28 +41,38 @@ func (p Probe) IsSupported(op uint8) bool {
 		if p.Ops[i].Op != op {
 			continue
 		}
+
 		return p.Ops[i].Flags&opSupported > 0
 	}
+
 	return false
 }
 
 func CheckAvailableFeatures() (string, error) {
 	ring := newRing()
-	var flags uint32
-	var result string
+
+	var (
+		flags  uint32
+		result string
+	)
+
 	err := ring.QueueInit(1, flags)
 	if err != nil {
 		return result, err
 	}
+
 	var probe *Probe
+
 	probe, err = ring.RegisterProbe()
 	if err != nil {
 		return result, err
 	}
+
 	err = ring.QueueExit()
 	if err != nil {
 		return result, err
 	}
+
 	for opCode, opCodeName := range opCodesMap {
 		var status string
 		if !probe.IsSupported(opCode) {
@@ -70,25 +80,34 @@ func CheckAvailableFeatures() (string, error) {
 		}
 		result += fmt.Sprintf("%s is%s supported\n", opCodeName, status)
 	}
+
 	return result, nil
 }
 
 func IsOpSupported(opCode uint8) (bool, error) {
 	ring := newRing()
-	var flags uint32
-	var result bool
+
+	var (
+		flags  uint32
+		result bool
+	)
+
 	err := ring.QueueInit(1, flags)
 	if err != nil {
 		return result, err
 	}
+
 	var probe *Probe
+
 	probe, err = ring.RegisterProbe()
 	if err != nil {
 		return result, err
 	}
+
 	err = ring.QueueExit()
 	if err != nil {
 		return result, err
 	}
+
 	return probe.IsSupported(opCode), nil
 }

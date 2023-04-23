@@ -81,11 +81,15 @@ func newRing() *Ring {
 }
 
 func CreateRing() (*Ring, error) {
-	ring := newRing()
-	var flags uint32
+	var (
+		ring  = newRing()
+		flags uint32
+	)
+
 	err := ring.QueueInit(defaultMaxQueue, flags)
 	if err != nil {
 		return nil, err
 	}
+
 	return ring, nil
 }

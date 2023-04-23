@@ -12,18 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gain
+package queue
 
-type EventHandler interface {
-	OnOpen(fd int)
-	OnClose(fd int)
-	OnData(c Conn) error
-	AfterWrite(c Conn)
+type LockFreeQueue[T any] interface {
+	Enqueue(T)
+	Dequeue() T
+	IsEmpty() bool
+	Size() int32
 }
-
-type DefaultEventHandler struct{}
-
-func (e DefaultEventHandler) OnOpen(fd int)     {}
-func (e DefaultEventHandler) OnClose(fd int)    {}
-func (e DefaultEventHandler) OnData(c Conn)     {}
-func (e DefaultEventHandler) AfterWrite(c Conn) {}

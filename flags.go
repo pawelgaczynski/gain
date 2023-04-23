@@ -38,5 +38,6 @@ func flagToString(flag uint64) string {
 	case flag&closeConnFlag > 0:
 		return "close conn flag"
 	}
+
 	return "unknown flag"
 }

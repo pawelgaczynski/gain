@@ -15,9 +15,8 @@
 package gain
 
 import (
-	"unsafe"
-
-	"golang.org/x/sys/unix"
+	"syscall"
+	_ "unsafe" //nolint:revive // it is required for go:linkname directive
 )
 
 type void struct{}
@@ -26,9 +25,13 @@ var member void
 
 const uint64Size = 64
 
-func createClientAddr() (uintptr, uint64) {
-	var clientLen = new(uint32)
-	clientAddr := &unix.RawSockaddrAny{}
-	*clientLen = unix.SizeofSockaddrAny
-	return uintptr(unsafe.Pointer(clientAddr)), uint64(uintptr(unsafe.Pointer(clientLen)))
+func createClientAddr() (*syscall.RawSockaddrAny, *uint32) {
+	clientAddrLen := new(uint32)
+	clientAddr := &syscall.RawSockaddrAny{}
+	*clientAddrLen = syscall.SizeofSockaddrAny
+
+	return clientAddr, clientAddrLen
 }
+
+//go:linkname anyToSockaddr syscall.anyToSockaddr
+func anyToSockaddr(rsa *syscall.RawSockaddrAny) (syscall.Sockaddr, error)

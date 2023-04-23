@@ -1,3 +1,17 @@
+// Copyright (c) 2023 Paweł Gaczyński
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package gain
 
 import (
@@ -26,14 +40,11 @@ type worker interface {
 type workerStartListener func()
 
 type workerConfig struct {
-	lockOSThread          bool
-	processPriority       bool
-	bufferSize            uint
-	maxCQEvents           int
-	batchSubmitter        bool
-	prefillConnectionPool bool
-	loggerLevel           zerolog.Level
-	prettyLogger          bool
+	cpuAffinity     bool
+	processPriority bool
+	maxCQEvents     int
+	loggerLevel     zerolog.Level
+	prettyLogger    bool
 }
 
 type workerImpl struct {
@@ -58,22 +69,41 @@ func (w *workerImpl) index() int {
 	return w.idx
 }
 
-func (w *workerImpl) processEvent(cqe *iouring.CompletionQueueEvent) bool {
+func (w *workerImpl) processEvent(cqe *iouring.CompletionQueueEvent,
+	skipErrorChecker func(*iouring.CompletionQueueEvent) bool,
+) bool {
+	w.logDebug().
+		Int32("Res", cqe.Res()).
+		Uint64("req key", cqe.UserData() & ^allFlagsMask).
+		Uint64("user data", cqe.UserData()).
+		Str("req flag", flagToString(cqe.UserData())).
+		Msg("Process event")
+
 	switch {
 	case cqe.Res() < 0:
-		w.logError(nil).
-			Str("error", unix.ErrnoName(-syscall.Errno(cqe.Res()))).
-			Str("req flag", flagToString(cqe.UserData())).
-			Uint64("req fd", cqe.UserData() & ^allFlagsMask).
-			Uint64("user data", cqe.UserData()).
-			Msg("worker request returns error code")
+		if !skipErrorChecker(cqe) {
+			w.logError(nil).
+				Str("error", unix.ErrnoName(-syscall.Errno(cqe.Res()))).
+				Str("req flag", flagToString(cqe.UserData())).
+				Uint64("req key", cqe.UserData() & ^allFlagsMask).
+				Uint64("user data", cqe.UserData()).
+				Msg("worker request returns error code")
+		}
+
 		return true
+
 	case cqe.UserData() == 0:
 		w.logError(nil).
 			Msg("user data flag is missing")
+
 		return true
 	}
+
 	return false
+}
+
+func (w *workerImpl) logDebug() *zerolog.Event {
+	return w.logger.Debug().Int("worker index", w.index()).Int("ring fd", w.ringFd())
 }
 
 func (w *workerImpl) logInfo() *zerolog.Event {
@@ -90,14 +120,13 @@ func (w *workerImpl) logError(err error) *zerolog.Event {
 
 func newWorkerImpl(
 	ring *iouring.Ring, config workerConfig, index int, logger zerolog.Logger,
-) (*workerImpl, error) {
-	worker := &workerImpl{
+) *workerImpl {
+	return &workerImpl{
 		logger:      logger,
 		shutdowner:  newShutdowner(),
 		connCloser:  newConnCloser(ring, logger),
-		looper:      newLooper(ring, config.lockOSThread, config.processPriority, config.maxCQEvents, config.batchSubmitter),
+		looper:      newLooper(ring, config.cpuAffinity, config.processPriority, config.maxCQEvents),
 		startedChan: make(chan startSignal),
 		idx:         index,
 	}
-	return worker, nil
 }

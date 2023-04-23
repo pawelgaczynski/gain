@@ -16,30 +16,31 @@ package gain
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 type shutdowner struct {
-	shutdowning bool
-	inProgress  bool
+	shutdowning atomic.Bool
+	inProgress  atomic.Bool
 	wg          sync.WaitGroup
 }
 
 func (s *shutdowner) markShutdownInProgress() {
-	s.inProgress = true
+	s.inProgress.Store(true)
 }
 
 func (s *shutdowner) needToShutdown() bool {
-	return s.shutdowning && !s.inProgress
+	return s.shutdowning.Load() && !s.inProgress.Load()
 }
 
 func (s *shutdowner) notifyFinish() {
-	if s.shutdowning {
+	if s.shutdowning.Load() {
 		s.wg.Done()
 	}
 }
 
 func (s *shutdowner) shutdown() {
-	s.shutdowning = true
+	s.shutdowning.Store(true)
 	s.wg.Add(1)
 	s.wg.Wait()
 }

@@ -24,44 +24,48 @@ import (
 	"unsafe"
 
 	"github.com/pawelgaczynski/gain/iouring"
+	gnet "github.com/pawelgaczynski/gain/pkg/net"
 	. "github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
 
 const (
-	accept = iota
-	recv
-	send
+	tcpAccept = iota
+	tcpRecv
+	tcpSend
 )
 
-type connection struct {
+type tcpConnection struct {
 	fd     uint64
 	buffer []byte
 	state  int
 }
 
-func loop(t *testing.T, ring *iouring.Ring, socketFd int, connection *connection) bool {
+func tcpLoop(t *testing.T, ring *iouring.Ring, socketFd int, connection *tcpConnection) bool {
+	t.Helper()
+
 	cqe, err := ring.WaitCQE()
 	if errors.Is(err, iouring.ErrAgain) || errors.Is(err, iouring.ErrInterrupredSyscall) ||
 		errors.Is(err, iouring.ErrTimerExpired) {
 		return false
 	}
+
 	Nil(t, err)
 	entry, err := ring.GetSQE()
 	Nil(t, err)
 	ring.CQESeen(cqe)
 
 	switch connection.state {
-	case accept:
+	case tcpAccept:
 		Equal(t, uint64(socketFd), cqe.UserData())
 		Greater(t, cqe.Res(), int32(0))
 		connection.fd = uint64(cqe.Res())
 		entry.PrepareRecv(
 			int(connection.fd), uintptr(unsafe.Pointer(&connection.buffer[0])), uint32(len(connection.buffer)), 0)
 		entry.UserData = connection.fd
+		connection.state = tcpRecv
 
-		connection.state = recv
-	case recv:
+	case tcpRecv:
 		Equal(t, connection.fd, cqe.UserData())
 		Equal(t, cqe.Res(), int32(18))
 		Equal(t, "testdata1234567890", string(connection.buffer[:18]))
@@ -73,9 +77,9 @@ func loop(t *testing.T, ring *iouring.Ring, socketFd int, connection *connection
 		entry.PrepareSend(
 			int(connection.fd), uintptr(unsafe.Pointer(&buffer[0])), uint32(len(buffer)), 0)
 		entry.UserData = connection.fd
+		connection.state = tcpSend
 
-		connection.state = send
-	case send:
+	case tcpSend:
 		Equal(t, connection.fd, cqe.UserData())
 		Greater(t, cqe.Res(), int32(0))
 		err = syscall.Shutdown(int(connection.fd), syscall.SHUT_RDWR)
@@ -86,18 +90,21 @@ func loop(t *testing.T, ring *iouring.Ring, socketFd int, connection *connection
 	cqeNr, err := ring.Submit()
 	Nil(t, err)
 	Equal(t, uint(1), cqeNr)
+
 	return false
 }
 
-func TestRecvSend(t *testing.T) {
+func TestTCPRecvSend(t *testing.T) {
 	ring, err := iouring.CreateRing()
 	Nil(t, err)
+
 	defer ring.Close()
 
 	socketFd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	Nil(t, err)
 	err = syscall.SetsockoptInt(socketFd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 	Nil(t, err)
+	testPort := getTestPort()
 	err = syscall.Bind(socketFd, &syscall.SockaddrInet4{
 		Port: testPort,
 	})
@@ -106,49 +113,54 @@ func TestRecvSend(t *testing.T) {
 	Nil(t, err)
 	err = syscall.Listen(socketFd, 128)
 	Nil(t, err)
+
 	defer func() {
-		err := syscall.Close(socketFd)
-		Nil(t, err)
+		closeErr := syscall.Close(socketFd)
+		Nil(t, closeErr)
 	}()
 
 	entry, err := ring.GetSQE()
 	Nil(t, err)
-	var clientLen = new(uint32)
+	clientLen := new(uint32)
 	clientAddr := &unix.RawSockaddrAny{}
 	*clientLen = unix.SizeofSockaddrAny
 	clientAddrPointer := uintptr(unsafe.Pointer(clientAddr))
 	clientLenPointer := uint64(uintptr(unsafe.Pointer(clientLen)))
-
 	entry.PrepareAccept(int(uintptr(socketFd)), clientAddrPointer, clientLenPointer, 0)
 	entry.UserData = uint64(socketFd)
 	cqeNr, err := ring.Submit()
 	Nil(t, err)
 	Equal(t, uint(1), cqeNr)
 
-	connection := &connection{state: accept, buffer: make([]byte, 64)}
+	connection := &tcpConnection{state: tcpAccept, buffer: make([]byte, 64)}
 
 	clientConnChan := make(chan net.Conn)
 	go func() {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", testPort), time.Second)
-		Nil(t, err)
+		conn, cErr := net.DialTimeout(gnet.TCP, fmt.Sprintf("localhost:%d", testPort), time.Second)
+		Nil(t, cErr)
 		NotNil(t, conn)
-		n, err := conn.Write([]byte("testdata1234567890"))
-		Nil(t, err)
-		Equal(t, 18, n)
+		bytesWritten, cErr := conn.Write([]byte("testdata1234567890"))
+		Nil(t, cErr)
+		Equal(t, 18, bytesWritten)
+
 		var buffer [22]byte
-		n, err = conn.Read(buffer[:])
-		Nil(t, err)
-		Equal(t, 22, n)
+		bytesWritten, cErr = conn.Read(buffer[:])
+		Nil(t, cErr)
+		Equal(t, 22, bytesWritten)
 		Equal(t, "responsedata0123456789", string(buffer[:]))
 		clientConnChan <- conn
 	}()
+
 	defer func() {
 		conn := <-clientConnChan
-		err = conn.(*net.TCPConn).SetLinger(0)
-		Nil(t, err)
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			lErr := tcpConn.SetLinger(0)
+			Nil(t, lErr)
+		}
 	}()
+
 	for {
-		if loop(t, ring, socketFd, connection) {
+		if tcpLoop(t, ring, socketFd, connection) {
 			break
 		}
 	}

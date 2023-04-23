@@ -40,8 +40,11 @@ func (ring *Ring) enter2(
 	size int,
 	raw bool,
 ) (uint, error) {
-	var consumed uintptr
-	var errno syscall.Errno
+	var (
+		consumed uintptr
+		errno    syscall.Errno
+	)
+
 	if raw {
 		consumed, _, errno = syscall.RawSyscall6(
 			sysEnter,
@@ -63,6 +66,7 @@ func (ring *Ring) enter2(
 			uintptr(size),
 		)
 	}
+
 	switch errno {
 	case syscall.ETIME:
 		return 0, ErrTimerExpired
@@ -75,5 +79,6 @@ func (ring *Ring) enter2(
 			return 0, os.NewSyscallError("io_uring_enter", errno)
 		}
 	}
+
 	return uint(consumed), nil
 }

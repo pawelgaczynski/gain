@@ -41,15 +41,16 @@ func (entry *SubmissionQueueEntry) prepareRW(opcode uint8, fd int, addr uintptr,
 	entry._pad2[1] = 0
 }
 
+// PrepareSplice has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSplice(
-	fdIn int, offIn int64, fdOut int, offOut int64, nbytes uint, spliceFlags uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	_ int, _ int64, _ int, _ int64, _ uint, _ uint,
+) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareTee(fdIn int, fdOut int, nbytes uint, spliceFlags uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareTee has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareTee(_ int, _ int, _ uint, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareReadv(fd int, iovecs uintptr, nrVecs uint32, offset uint64) {
@@ -103,47 +104,38 @@ func (entry *SubmissionQueueEntry) PrepareWriteFixed(
 	entry.BufIG = uint16(index)
 }
 
-func (entry *SubmissionQueueEntry) PrepareRecvMsg(
-	fd int,
-	msg uintptr,
-	flags uint32,
-) {
-	// TODO
-	log.Fatal(errNotImplemented)
-}
-
 func (entry *SubmissionQueueEntry) PrepareSendMsg(
-	fd int,
-	msg uintptr,
+	fileDescriptor int,
+	msg *syscall.Msghdr,
 	flags uint32,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	entry.prepareRW(OpSendmsg, fileDescriptor, uintptr(unsafe.Pointer(msg)), 1, 0)
+	entry.OpcodeFlags = flags
 }
 
-func (entry *SubmissionQueueEntry) PreparePollAdd(fd int, pollMask uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PreparePollAdd has not been implemented yet.
+func (entry *SubmissionQueueEntry) PreparePollAdd(_ int, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PreparePollMultishot(fd int, pollMask uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PreparePollMultishot has not been implemented yet.
+func (entry *SubmissionQueueEntry) PreparePollMultishot(_ int, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PreparePollRemove(fd int, userData uint64) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PreparePollRemove has not been implemented yet.
+func (entry *SubmissionQueueEntry) PreparePollRemove(_ int, _ uint64) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PreparePollUpdate(fd int, oldUserData, newUserData uint64, pollMask, flags uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PreparePollUpdate has not been implemented yet.
+func (entry *SubmissionQueueEntry) PreparePollUpdate(_ int, _, _ uint64, _, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareFsync(fd int, fsyncFlags uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareFsync has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareFsync(_ int, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareNop() {
@@ -174,44 +166,45 @@ func (entry *SubmissionQueueEntry) PrepareAccept(fd int, addr uintptr, addrLen u
 }
 
 func (entry *SubmissionQueueEntry) PrepareAcceptDirect(
-	fd int, addr uintptr, addrLen uint64, flags uint32, fileIndex uint) {
+	fd int, addr uintptr, addrLen uint64, flags uint32, fileIndex uint,
+) {
 	entry.PrepareAccept(fd, addr, addrLen, flags)
 	entry.setTargetFixedFile(fileIndex)
 }
 
-func (entry *SubmissionQueueEntry) PrepareCancel(userData uint64, flags int) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareCancel has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareCancel(_ uint64, _ int) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareLinkTimeout(ts *syscall.Timespec, flags uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareLinkTimeout has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareLinkTimeout(_ *syscall.Timespec, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareConnect(fd int, addr uintptr, addrLen uint64) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareConnect has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareConnect(_ int, _ uintptr, _ uint64) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareConnectFilesUpdate(fds []int, nrFds uint64, offset uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareConnectFilesUpdate has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareConnectFilesUpdate(_ []int, _ uint64, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareFallocate(fd int, mode int, offset uint64, length uint64) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareFallocate has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareFallocate(_ int, _ int, _ uint64, _ uint64) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareOpenat(dfd int, path string, flags int, mode uint32) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareOpenat has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareOpenat(_ int, _ string, _ int, _ uint32) {
+	log.Panic(ErrNotImplemented)
 }
 
-func (entry *SubmissionQueueEntry) PrepareOpenatDirect(dfd int, path string, flags int, mode uint32, fileIndex uint) {
-	// TODO
-	log.Fatal(errNotImplemented)
+// PrepareOpenatDirect has not been implemented yet.
+func (entry *SubmissionQueueEntry) PrepareOpenatDirect(_ int, _ string, _ int, _ uint32, _ uint) {
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareClose(fd int) {
@@ -223,54 +216,54 @@ func (entry *SubmissionQueueEntry) PrepareCloseDirect(fileIndex uint) {
 	entry.setTargetFixedFile(fileIndex)
 }
 
+// PrepareRead has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareRead(
-	fd int,
-	buffer uintptr,
-	nbytes uint32,
-	offset uint64,
+	_ int,
+	_ uintptr,
+	_ uint32,
+	_ uint64,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareWrite has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareWrite(
-	fd int,
-	buffer uintptr,
-	nbytes uint32,
-	offset uint64,
+	_ int,
+	_ uintptr,
+	_ uint32,
+	_ uint64,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareStatx has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareStatx(
-	dfd int,
-	path string,
-	flags int,
-	mask uint,
-	statxbuf uintptr,
+	_ int,
+	_ string,
+	_ int,
+	_ uint,
+	_ uintptr,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareFadvise has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareFadvise(
-	fd int,
-	offset uint64,
-	length uint32,
-	advise int,
+	_ int,
+	_ uint64,
+	_ uint32,
+	_ int,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareMadvise has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareMadvise(
-	addr uintptr,
-	length uint32,
-	advise int,
+	_ uintptr,
+	_ uint32,
+	_ int,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareSend(
@@ -283,23 +276,23 @@ func (entry *SubmissionQueueEntry) PrepareSend(
 	entry.OpcodeFlags = flags
 }
 
+// PrepareSendZC has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSendZC(
-	fileDescriptor int,
-	addr uintptr,
-	length uint32,
-	flags uint32,
-	zcFlags uint,
+	_ int,
+	_ uintptr,
+	_ uint32,
+	_ uint32,
+	_ uint,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSendSetAddr has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSendSetAddr(
-	addr uintptr,
-	length uint16,
+	_ uintptr,
+	_ uint16,
 ) {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareRecv(
@@ -309,6 +302,15 @@ func (entry *SubmissionQueueEntry) PrepareRecv(
 	flags uint32,
 ) {
 	entry.prepareRW(OpRecv, fileDescriptor, addr, length, 0)
+	entry.OpcodeFlags = flags
+}
+
+func (entry *SubmissionQueueEntry) PrepareRecvMsg(
+	fileDescriptor int,
+	msg *syscall.Msghdr,
+	flags uint32,
+) {
+	entry.prepareRW(OpRecvmsg, fileDescriptor, uintptr(unsafe.Pointer(msg)), 1, 0)
 	entry.OpcodeFlags = flags
 }
 
@@ -322,19 +324,19 @@ func (entry *SubmissionQueueEntry) PrepareRecvMultishot(
 	entry.IoPrio |= RecvMultishot
 }
 
+// PrepareOpenat2 has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareOpenat2() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareOpenat2Direct has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareOpenat2Direct() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareEpollCtrl has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareEpollCtrl() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareProvideBuffers(
@@ -360,69 +362,69 @@ func (entry *SubmissionQueueEntry) PrepareProvideBuffers(
 	entry._pad2[1] = 0
 }
 
+// PrepareRemoveBuffers has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareRemoveBuffers() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareShutdown has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareShutdown() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareUnlinkat has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareUnlinkat() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareUnlink has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareUnlink() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareRenameat has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareRenameat() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareRename has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareRename() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSyncFileRange has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSyncFileRange() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareMkdirat has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareMkdirat() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareMkdir has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareMkdir() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSymlinkat has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSymlinkat() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSymlink has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSymlink() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareLinkat has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareLinkat() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareLink has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareLink() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareMsgRing(fd int, length uint32, data uint64, flags uint32) {
@@ -430,39 +432,39 @@ func (entry *SubmissionQueueEntry) PrepareMsgRing(fd int, length uint32, data ui
 	entry.OpcodeFlags = flags
 }
 
+// PrepareGetxattr has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareGetxattr() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSetxattr has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSetxattr() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareFgetxattr has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareFgetxattr() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareFsetxattr has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareFsetxattr() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSocket has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSocket() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSocketDirect has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSocketDirect() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
+// PrepareSocketDirectAlloc has not been implemented yet.
 func (entry *SubmissionQueueEntry) PrepareSocketDirectAlloc() {
-	// TODO
-	log.Fatal(errNotImplemented)
+	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareTimeout2(ts *syscall.Timespec, count uint64, flags uint32) {

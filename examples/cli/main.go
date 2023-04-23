@@ -1,10 +1,11 @@
-// nolint:gochecknoinits,forbidigo
+//nolint:gochecknoinits,forbidigo,goerr113,forcetypeassert,wrapcheck
 package main
 
 import (
 	"fmt"
 	"log"
 	"net/http"
+	_ "net/http/pprof" //nolint:gosec
 	"os"
 	"os/signal"
 	"runtime"
@@ -12,15 +13,13 @@ import (
 	"time"
 
 	"github.com/pawelgaczynski/gain"
-	"github.com/pawelgaczynski/gain/logger"
+	gainNet "github.com/pawelgaczynski/gain/pkg/net"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
 )
 
 const (
-	maxConnections = 1024
-	bufferSize     = 4096
-	port           = 9876
+	port = 9000
 )
 
 var (
@@ -28,148 +27,138 @@ var (
 	pprofReadHeaderTimeout = 3 * time.Second
 )
 
-var loggerLevelFlags = []string{
-	"debug", "info", "warn", "error", "fatal", "panic", "disabled", "trace",
+var architectures = []string{
+	"reactor", "sharding",
 }
 
-func loggerFlagToLevel(flag string) zerolog.Level {
-	switch flag {
-	case "debug":
-		return logger.DebugLevel
-	case "info":
-		return logger.InfoLevel
-	case "warn":
-		return logger.WarnLevel
-	case "error":
-		return logger.ErrorLevel
-	case "fatal":
-		return logger.FatalLevel
-	case "panic":
-		return logger.PanicLevel
-	case "disabled":
-		return logger.Disabled
-	case "trace":
-		return logger.TraceLevel
-	default:
-		return logger.NoLevel
-	}
+var allowedNetworks = []string{
+	gainNet.TCP, gainNet.UDP,
+}
+
+var handlers = []string{
+	"http", "echo",
 }
 
 type cmdConfig struct {
-	sharding              bool
-	workers               int
-	maxConnections        int
-	bufferSize            int
-	port                  int
-	prettyLogger          bool
-	asyncHandler          bool
-	goroutinePool         bool
-	lockOSThread          bool
-	cBPF                  bool
-	batchSubmitter        bool
-	processPriority       bool
-	prefillConnectionPool bool
-	loggerLevel           string
+	gain.Config
+	port    int
+	handler string
+	network string
+}
+
+var contains = func(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
 }
 
 var config = &cmdConfig{}
 
 var flags = []cli.Flag{
-	&cli.BoolFlag{
-		Name:        "sharding",
-		Value:       false,
-		Usage:       "sharding architecture",
-		Destination: &config.sharding,
+	&cli.StringFlag{
+		Name:  "architecture",
+		Value: "reactor",
+		Usage: "server architecture",
+		Action: func(ctx *cli.Context, v string) error {
+			if !contains(architectures, v) {
+				return fmt.Errorf("possible values for architectures: %v", architectures)
+			}
+			switch v {
+			case "reactor":
+				config.Architecture = gain.Reactor
+			case "sharding":
+				config.Architecture = gain.SocketSharding
+			}
+
+			return nil
+		},
 	},
 	&cli.IntFlag{
 		Name:        "workers",
 		Value:       runtime.NumCPU(),
 		Usage:       "number of workers",
-		Destination: &config.workers,
-	},
-	&cli.IntFlag{
-		Name:        "maxConnections",
-		Value:       maxConnections,
-		Usage:       "maximum number of connections",
-		Destination: &config.maxConnections,
-	},
-	&cli.IntFlag{
-		Name:        "bufferSize",
-		Value:       bufferSize,
-		Usage:       "size of read/write buffer",
-		Destination: &config.bufferSize,
+		Destination: &config.Workers,
 	},
 	&cli.IntFlag{
 		Name:        "port",
 		Value:       port,
-		Usage:       "listen TCP port",
+		Usage:       "listen port",
 		Destination: &config.port,
 	},
 	&cli.BoolFlag{
 		Name:        "prettyLogger",
 		Value:       false,
 		Usage:       "print prettier logs. Warning: it can slow down server",
-		Destination: &config.prettyLogger,
+		Destination: &config.PrettyLogger,
 	},
 	&cli.BoolFlag{
 		Name:        "asyncHandler",
 		Value:       false,
 		Usage:       "use async handler for writes",
-		Destination: &config.asyncHandler,
+		Destination: &config.AsyncHandler,
 	},
 	&cli.BoolFlag{
 		Name:        "goroutinePool",
 		Value:       false,
 		Usage:       "use goroutine pool for async handler",
-		Destination: &config.goroutinePool,
+		Destination: &config.GoroutinePool,
 	},
 	&cli.BoolFlag{
-		Name:        "lockOSThread",
+		Name:        "cpuAffinity",
 		Value:       false,
-		Usage:       "lock OS thread for worker",
-		Destination: &config.lockOSThread,
+		Usage:       "set CPU Affinity",
+		Destination: &config.CPUAffinity,
 	},
 	&cli.BoolFlag{
 		Name:        "cbpf",
 		Value:       false,
 		Usage:       "use CBPF for bette packet locality",
-		Destination: &config.cBPF,
-	},
-	&cli.BoolFlag{
-		Name:        "batchSubmitter",
-		Value:       false,
-		Usage:       "use batch io_uring requests submitter instead of single submitter",
-		Destination: &config.batchSubmitter,
+		Destination: &config.CBPFilter,
 	},
 	&cli.BoolFlag{
 		Name:        "processPriority",
 		Value:       false,
 		Usage:       "set high process priority. Note: requires root privileges",
-		Destination: &config.processPriority,
-	},
-	&cli.BoolFlag{
-		Name:        "prefillConnectionPool",
-		Value:       false,
-		Usage:       "prefill connection pool at start",
-		Destination: &config.prefillConnectionPool,
+		Destination: &config.ProcessPriority,
 	},
 	&cli.StringFlag{
-		Name:        "loggerLevel",
-		Value:       "debug",
-		Usage:       "logger level",
-		Destination: &config.loggerLevel,
+		Name:  "loggerLevel",
+		Value: "error",
+		Usage: "logger level",
 		Action: func(ctx *cli.Context, v string) error {
-			contains := func(s []string, str string) bool {
-				for _, v := range s {
-					if v == str {
-						return true
-					}
-				}
-				return false
+			var err error
+			config.LoggerLevel, err = zerolog.ParseLevel(v)
+
+			return err
+		},
+	},
+	&cli.StringFlag{
+		Name:        "handler",
+		Value:       "echo",
+		Usage:       "handler type. Allowed values are 'http' and 'echo'",
+		Destination: &config.handler,
+		Action: func(ctx *cli.Context, v string) error {
+			if !contains(handlers, v) {
+				return fmt.Errorf("possible values for handler: %v", handlers)
 			}
-			if !contains(loggerLevelFlags, v) {
-				return fmt.Errorf("possible values for logger level: %v", loggerLevelFlags)
+
+			return nil
+		},
+	},
+	&cli.StringFlag{
+		Name:        "network",
+		Value:       gainNet.TCP,
+		Usage:       "network type",
+		Destination: &config.network,
+		Action: func(ctx *cli.Context, v string) error {
+			if !contains(allowedNetworks, v) {
+				return fmt.Errorf("possible values for networks: %v", allowedNetworks)
 			}
+
 			return nil
 		},
 	},
@@ -179,15 +168,16 @@ func getHTTPLastLine() []byte {
 	return []byte("\r\nContent-Length: 13\r\n\r\nHello, World!")
 }
 
-var httpFirstLine = []byte("HTTP/1.1 200 OK\r\nServer: gnet\r\nContent-Type: text/plain\r\nDate: ")
-var httpLastLine = getHTTPLastLine()
-
-type Handler struct{}
+var (
+	httpFirstLine = []byte("HTTP/1.1 200 OK\r\nServer: gain\r\nContent-Type: text/plain\r\nDate: ")
+	httpLastLine  = getHTTPLastLine()
+)
 
 var now atomic.Value
 
 func ticktock() {
 	now.Store(nowTimeFormat())
+
 	for range time.Tick(time.Second) {
 		now.Store(nowTimeFormat())
 	}
@@ -201,30 +191,44 @@ func nowTimeFormat() string {
 	return time.Now().Format("Mon, 02 Jan 2006 15:04:05 GMT")
 }
 
-func (h Handler) OnOpen(fd int) {}
-
-func (h Handler) OnClose(fd int) {}
-
-func (h Handler) OnData(c gain.Conn) error {
-	_, err := c.Write(httpFirstLine)
-	if err != nil {
-		return err
-	}
-	_, err = c.Write([]byte(NowTimeFormat()))
-	if err != nil {
-		return err
-	}
-	_, err = c.Write(httpLastLine)
-	if err != nil {
-		return err
-	}
-	return nil
+type EchoHandler struct {
+	gain.DefaultEventHandler
 }
 
-func (h Handler) AfterWrite(c gain.Conn) {}
+func (h EchoHandler) OnRead(c gain.Conn) {
+	buf, _ := c.Next(-1)
+	_, _ = c.Write(buf)
+}
+
+type HTTPHandler struct {
+	gain.DefaultEventHandler
+}
+
+func (h HTTPHandler) OnRead(conn gain.Conn) {
+	_, err := conn.Discard(conn.InboundBuffered())
+	if err != nil {
+		log.Panic(err)
+	}
+
+	_, err = conn.Write(httpFirstLine)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	_, err = conn.Write([]byte(NowTimeFormat()))
+	if err != nil {
+		log.Panic(err)
+	}
+
+	_, err = conn.Write(httpLastLine)
+	if err != nil {
+		log.Panic(err)
+	}
+}
 
 func main() {
 	runtime.GOMAXPROCS(goMaxProcs)
+
 	go func() {
 		server := &http.Server{
 			Addr:              "0.0.0.0:6061",
@@ -232,49 +236,42 @@ func main() {
 		}
 		log.Println(server.ListenAndServe())
 	}()
+
 	var server *gain.Server
 	app := &cli.App{
 		EnableBashCompletion: true,
 		Flags:                flags,
 		Name:                 "cli",
-		Usage:                "Gain TCP server",
+		Usage:                "Gain TCP/UDP server",
 		Action: func(*cli.Context) error {
-			opts := []gain.EngineOption{
-				gain.WithMaxConn(uint(config.maxConnections)),
-				gain.WithBufferSize(uint(config.bufferSize)),
-				gain.WithPort(config.port),
-				gain.WithLoggerLevel(loggerFlagToLevel(config.loggerLevel)),
-				gain.WithPrettyLogger(config.prettyLogger),
-				gain.WithAsyncHandler(config.asyncHandler),
-				gain.WithGoroutinePool(config.goroutinePool),
-				gain.WithLockOSThread(config.lockOSThread),
-				gain.WithWorkers(config.workers),
-				gain.WithCBPF(config.cBPF),
-				gain.WithBatchSubmitter(config.batchSubmitter),
-				gain.WithSharding(config.sharding),
-				gain.WithProcessPriority(config.processPriority),
-				gain.WithPrefillConnectionPool(config.prefillConnectionPool),
-			}
-			config := gain.NewConfig(opts...)
 			fmt.Printf("Configuration: %+v \n", config)
-			fmt.Println("Starting Gain TCP Server...")
-			server = gain.NewServer(config, Handler{})
-			return server.Start()
+			fmt.Printf("Starting Gain %s Server...\n", config.network)
+			if config.handler == "echo" {
+				server = gain.NewServer(EchoHandler{}, config.Config)
+			} else if config.handler == "http" {
+				server = gain.NewServer(HTTPHandler{}, config.Config)
+			}
+
+			return server.Start(fmt.Sprintf("%s://localhost:%d", config.network, port))
 		},
 	}
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
+
 	go func() {
 		<-c
 		fmt.Println("Server closing...")
 		server.Close()
 	}()
+
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 }
 
 func init() {
 	now.Store(nowTimeFormat())
+
 	go ticktock()
 }

@@ -14,4 +14,10 @@
 
 package iouring_test
 
-const testPort = 9876
+import "sync/atomic"
+
+var port int32 = 8000
+
+func getTestPort() int {
+	return int(atomic.AddInt32(&port, 1))
+}

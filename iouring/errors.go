@@ -14,11 +14,20 @@
 
 package iouring
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
-	errNotImplemented     = errors.New("not implemented")
+	ErrNotImplemented     = errors.New("not implemented")
+	ErrNotSupported       = errors.New("not supported")
 	ErrTimerExpired       = errors.New("timer expired")
 	ErrInterrupredSyscall = errors.New("interrupred system call")
 	ErrAgain              = errors.New("try again")
+	ErrSQEOverflow        = errors.New("SQE overflow")
 )
+
+func ErrorSQEOverflow(overflowValue uint32) error {
+	return fmt.Errorf("%w: %d", ErrSQEOverflow, overflowValue)
+}
