@@ -89,15 +89,17 @@ Gain requires Go 1.18+
 - [x] Lock-free
 - [ ] Protocols
     - [x] TCP
-    - [ ] UDP
+    - [x] UDP
     - [ ] Unix Domain Socket
 - [ ] Load balancing
     - [x] Round robin
     - [x] Least connection
-    - [ ] Source IP hash
+    - [x] Source IP hash
+    - [ ] Support for custom implementations
+- [ ] Support for read and write deadlines
 - [ ] Further io_uring optimizations
-- [ ] More flexible connection buffer
-- [ ] Documentation
+- [x] More flexible connection buffer
+- [x] Documentation
 - [x] Support for kernels older than 5.15
 - [ ] Support for Windows - IoRing ([documentation](https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/))
 
