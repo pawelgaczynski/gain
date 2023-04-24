@@ -79,7 +79,7 @@ type testServerHandler struct {
 	startedWg *sync.WaitGroup
 }
 
-func (h *testServerHandler) OnStart(server *gain.Server) {
+func (h *testServerHandler) OnStart(server gain.Server) {
 	h.startedWg.Done()
 
 	if h.onStartCallback != nil {

@@ -180,7 +180,7 @@ func newTestConnClientGroup(t *testing.T, network string, port int, n int) *test
 
 func newTestConnServer(
 	t *testing.T, network string, async bool, architecture gain.ServerArchitecture, eventHandler *testServerHandler,
-) (*gain.Server, int) {
+) (gain.Server, int) {
 	t.Helper()
 	opts := []gain.ConfigOption{
 		gain.WithLoggerLevel(zerolog.FatalLevel),

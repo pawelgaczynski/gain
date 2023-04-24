@@ -17,7 +17,7 @@ package gain
 
 type EventHandler interface {
 	// OnStart fires when the server is ready for accepting new connections.
-	OnStart(server *Server)
+	OnStart(server Server)
 	// OnOpen fires when a new connection has been opened.
 	// The Conn c has information about the connection such as it's local and remote address.
 	OnOpen(c Conn)
@@ -34,8 +34,8 @@ type EventHandler interface {
 // Compose it with your own implementation of EventHandler and you won't need to implement all callbacks.
 type DefaultEventHandler struct{}
 
-func (e DefaultEventHandler) OnStart(server *Server) {}
-func (e DefaultEventHandler) OnOpen(c Conn)          {}
-func (e DefaultEventHandler) OnClose(c Conn)         {}
-func (e DefaultEventHandler) OnRead(c Conn)          {}
-func (e DefaultEventHandler) OnWrite(c Conn)         {}
+func (e DefaultEventHandler) OnStart(server Server) {}
+func (e DefaultEventHandler) OnOpen(c Conn)         {}
+func (e DefaultEventHandler) OnClose(c Conn)        {}
+func (e DefaultEventHandler) OnRead(c Conn)         {}
+func (e DefaultEventHandler) OnWrite(c Conn)        {}

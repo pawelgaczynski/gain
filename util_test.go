@@ -28,7 +28,7 @@ func getTestPort() int {
 	return int(atomic.AddInt32(&port, 1))
 }
 
-type onStartCallback func(server *gain.Server)
+type onStartCallback func(server gain.Server)
 
 type onOpenCallback func(c gain.Conn)
 

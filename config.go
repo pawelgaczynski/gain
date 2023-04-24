@@ -36,7 +36,7 @@ type ServerArchitecture int
 
 const (
 	// Reactor design pattern has one input called Acceptor,
-	// which demultiplexes the handling of incoming calls to Consumer workers.
+	// which demultiplexes the handling of incoming connections to Consumer workers.
 	// The load balancing algorithm can be selected via configuration option.
 	Reactor ServerArchitecture = iota
 	// The Socket Sharding  allow multiple workers to listen on the same address and port combination.
@@ -49,7 +49,7 @@ type Config struct {
 	// Architecture indicates one of the two available architectures: Reactor and SocketSharding.
 	//
 	// The Reactor design pattern has one input called Acceptor,
-	// which demultiplexes the handling of incoming calls to Consumer workers.
+	// which demultiplexes the handling of incoming connections to Consumer workers.
 	// The load balancing algorithm can be selected via configuration option.
 	//
 	// The Socket Sharding allows multiple workers to listen on the same address and port combination.
@@ -64,7 +64,7 @@ type Config struct {
 	CPUAffinity bool
 	// ProcessPriority sets the prority of the process to high (-19). Requires root privileges.
 	ProcessPriority bool
-	// Workers indicates the number of consumer or shard workers. The default is runtime.NumCPU().
+	// Workers indicates the number of consumers or shard workers. The default is runtime.NumCPU().
 	Workers int
 	// CBPFilter uses custom BPF filter to improve the performance of the Socket Sharding architecture.
 	CBPFilter bool
@@ -112,7 +112,7 @@ func WithCPUAffinity(cpuAffinity bool) ConfigOption {
 	}
 }
 
-// WithProcessPriority sets the high process priority.
+// WithProcessPriority sets the high process priority. Note: requires root privileges.
 func WithProcessPriority(processPriority bool) ConfigOption {
 	return func(c *Config) {
 		c.ProcessPriority = processPriority

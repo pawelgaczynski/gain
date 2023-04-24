@@ -237,7 +237,7 @@ func main() {
 		log.Println(server.ListenAndServe())
 	}()
 
-	var server *gain.Server
+	var server gain.Server
 	app := &cli.App{
 		EnableBashCompletion: true,
 		Flags:                flags,
