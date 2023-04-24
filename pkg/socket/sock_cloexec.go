@@ -19,5 +19,5 @@ import (
 )
 
 func sysSocket(family, sotype, proto int) (int, error) {
-	return unix.Socket(family, sotype|unix.SOCK_CLOEXEC|unix.SOCK_NONBLOCK, proto)
+	return unix.Socket(family, sotype|unix.SOCK_CLOEXEC, proto)
 }

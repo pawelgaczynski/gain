@@ -252,7 +252,7 @@ func main() {
 				server = gain.NewServer(HTTPHandler{}, config.Config)
 			}
 
-			return server.Start(fmt.Sprintf("%s://localhost:%d", config.network, port))
+			return server.Start(fmt.Sprintf("%s://0.0.0.0:%d", config.network, port))
 		},
 	}
 
