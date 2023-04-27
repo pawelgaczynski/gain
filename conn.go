@@ -77,6 +77,12 @@ const (
 	msgControlBufferSize = 64
 )
 
+const (
+	noOp = iota
+	readOp
+	writeOp
+)
+
 type connection struct {
 	fd  int
 	key int
@@ -93,6 +99,8 @@ type connection struct {
 	remoteAddr net.Addr
 
 	ctx interface{}
+
+	nextAsyncOp int
 }
 
 func (c *connection) outboundReadAddress() unsafe.Pointer {

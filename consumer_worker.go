@@ -138,7 +138,7 @@ func (c *consumerWorker) getConnsFromQueue() {
 			c.logError(gainErrors.ErrorAddressNotFound(fd)).Msg("Get new connection error")
 		}
 
-		err := c.addReadRequest(conn)
+		err := c.addReadRequest(conn, false)
 		if err != nil {
 			c.logError(err).Msg("Add read() request for new connection error")
 
@@ -209,7 +209,7 @@ func (c *consumerWorker) loop(_ int) error {
 				c.logError(gainErrors.ErrorAddressNotFound(conn.fd)).Msg("Get new connection error")
 			}
 
-			err := c.addReadRequest(conn)
+			err := c.addReadRequest(conn, false)
 			if err != nil {
 				c.logError(err).Msg("Add read() request for new connection error")
 				_ = c.syscallCloseSocket(fileDescriptor)

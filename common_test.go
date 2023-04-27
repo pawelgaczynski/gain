@@ -21,6 +21,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -426,5 +427,101 @@ func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitectur
 	}(&clientDoneWg)
 
 	clientDoneWg.Wait()
+	server.Close()
+}
+
+func testLargeRead(t *testing.T, network string, architecture gain.ServerArchitecture) {
+	t.Helper()
+
+	doublePageSize := os.Getpagesize() * 4
+	data := make([]byte, doublePageSize)
+	_, err := rand.Read(data)
+	Nil(t, err)
+
+	var doneWg sync.WaitGroup
+
+	doneWg.Add(1)
+	onReadCallback := func(c gain.Conn) {
+		readBuffer := make([]byte, doublePageSize)
+
+		n, cErr := c.Read(readBuffer)
+		if err != nil {
+			log.Panic(cErr)
+		}
+
+		doneWg.Done()
+		Equal(t, doublePageSize, n)
+
+		n, cErr = c.Write(readBuffer)
+		if cErr != nil {
+			log.Panic(cErr)
+		}
+
+		Equal(t, doublePageSize, n)
+	}
+
+	testConnHandler := newTestServerHandler(onReadCallback)
+	server, port := newTestConnServer(t, network, false, architecture, testConnHandler)
+
+	clientsGroup := newTestConnClientGroup(t, network, port, 1)
+	clientsGroup.Dial()
+
+	clientsGroup.Write(data)
+	buffer := make([]byte, len(data))
+	clientsGroup.Read(buffer)
+
+	Equal(t, data, buffer)
+
+	doneWg.Wait()
+
+	server.Close()
+}
+
+func testMultipleReads(t *testing.T, network string, asyncHandler bool, architecture gain.ServerArchitecture) {
+	t.Helper()
+
+	doublePageSize := os.Getpagesize()
+	data := make([]byte, doublePageSize)
+	_, err := rand.Read(data)
+	Nil(t, err)
+
+	var (
+		doneWg        sync.WaitGroup
+		expectedReads int64 = 10
+		readsCount    atomic.Int64
+	)
+
+	doneWg.Add(int(expectedReads))
+	onReadCallback := func(c gain.Conn) {
+		readBuffer := make([]byte, doublePageSize)
+
+		n, cErr := c.Read(readBuffer)
+		if err != nil {
+			log.Panic(cErr)
+		}
+
+		doneWg.Done()
+		Equal(t, doublePageSize, n)
+
+		readsCount.Add(1)
+	}
+
+	testConnHandler := newTestServerHandler(onReadCallback)
+	server, port := newTestConnServer(t, network, asyncHandler, architecture, testConnHandler)
+
+	clientsGroup := newTestConnClientGroup(t, network, port, 1)
+	clientsGroup.Dial()
+
+	go func() {
+		for i := 0; i < int(expectedReads); i++ {
+			clientsGroup.Write(data)
+			time.Sleep(time.Millisecond * 200)
+		}
+	}()
+
+	doneWg.Wait()
+
+	Equal(t, expectedReads, readsCount.Load())
+
 	server.Close()
 }

@@ -190,3 +190,15 @@ func TestShardingTCPConnAddress(t *testing.T) {
 func TestShardingUDPConnAddress(t *testing.T) {
 	testConnAddress(t, gainNet.UDP, gain.SocketSharding)
 }
+
+func TestShardingTCPLargeRead(t *testing.T) {
+	testLargeRead(t, gainNet.TCP, gain.SocketSharding)
+}
+
+func TestShardingTCPMultipleReads(t *testing.T) {
+	testMultipleReads(t, gainNet.TCP, false, gain.SocketSharding)
+}
+
+func TestShardingTCPAsyncHandlerMultipleReads(t *testing.T) {
+	testMultipleReads(t, gainNet.TCP, true, gain.SocketSharding)
+}

@@ -74,7 +74,7 @@ func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
 		}
 	}
 
-	err := w.addReadRequest(conn)
+	err := w.addReadRequest(conn, false)
 	if err != nil {
 		return fmt.Errorf("add read request error: %w", err)
 	}
@@ -171,7 +171,7 @@ func (w *shardWorker) initLoop() {
 			conn.fd = w.fd
 			conn.initMsgHeader()
 
-			return w.addReadRequest(conn)
+			return w.addReadRequest(conn, false)
 		}
 	}
 	w.shutdownHandler = func() bool {

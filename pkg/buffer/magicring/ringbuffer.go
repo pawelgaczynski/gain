@@ -31,11 +31,10 @@ import (
 	"github.com/pawelgaczynski/gain/pkg/pool/virtualmem"
 )
 
-const (
-	MinRead = 512
+var (
+	DefaultMagicBufferSize = os.Getpagesize()
+	MinRead                = 1024
 )
-
-var DefaultMagicBufferSize = os.Getpagesize()
 
 // RingBuffer is a circular buffer that implement io.ReaderWriter interface.
 type RingBuffer struct {

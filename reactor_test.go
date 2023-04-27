@@ -112,3 +112,15 @@ func TestReactorTCPCloseConnAsync(t *testing.T) {
 func TestReactorTCPConnAddress(t *testing.T) {
 	testConnAddress(t, gainNet.TCP, gain.Reactor)
 }
+
+func TestReactorTCPLargeRead(t *testing.T) {
+	testLargeRead(t, gainNet.TCP, gain.Reactor)
+}
+
+func TestReactorTCPMultipleReads(t *testing.T) {
+	testMultipleReads(t, gainNet.TCP, false, gain.Reactor)
+}
+
+func TestReactorTCPAsyncHandlerMultipleReads(t *testing.T) {
+	testMultipleReads(t, gainNet.TCP, true, gain.Reactor)
+}

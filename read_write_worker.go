@@ -41,7 +41,7 @@ type readWriteWorkerImpl struct {
 	*reader
 	ring              *iouring.Ring
 	connectionManager *connectionManager
-	writeQueue        queue.LockFreeQueue[*connection]
+	asyncOpQueue      queue.LockFreeQueue[*connection]
 	pool              *pond.WorkerPool
 	eventHandler      EventHandler
 	asyncHandler      bool
@@ -58,21 +58,35 @@ func (w *readWriteWorkerImpl) handleAsyncWritesIfEnabled() {
 
 func (w *readWriteWorkerImpl) handleAsyncWrites() {
 	for {
-		if w.writeQueue.IsEmpty() {
+		if w.asyncOpQueue.IsEmpty() {
 			break
 		}
-		conn := w.writeQueue.Dequeue()
+		conn := w.asyncOpQueue.Dequeue()
 
-		if w.sendRecvMsg {
-			conn.setMsgHeaderWrite()
-		}
 		closed := conn.isClosed()
 
-		err := w.addWriteRequest(conn, closed)
-		if err != nil {
-			w.logError(err).Int("fd", conn.fd)
+		var err error
 
-			continue
+		switch conn.nextAsyncOp {
+		case readOp:
+			err = w.addReadRequest(conn, closed)
+			if err != nil {
+				w.logError(err).Int("fd", conn.fd)
+
+				continue
+			}
+
+		case writeOp:
+			if w.sendRecvMsg {
+				conn.setMsgHeaderWrite()
+			}
+
+			err = w.addWriteRequest(conn, closed)
+			if err != nil {
+				w.logError(err).Int("fd", conn.fd)
+
+				continue
+			}
 		}
 
 		if closed {
@@ -96,8 +110,12 @@ func (w *readWriteWorkerImpl) doAsyncWork(conn *connection) func() {
 		w.work(conn)
 
 		if conn.OutboundBuffered() > 0 {
-			w.writeQueue.Enqueue(conn)
+			conn.nextAsyncOp = writeOp
+		} else {
+			conn.nextAsyncOp = readOp
 		}
+
+		w.asyncOpQueue.Enqueue(conn)
 	}
 }
 
@@ -112,7 +130,7 @@ func (w *readWriteWorkerImpl) onWrite(cqe *iouring.CompletionQueueEvent, conn *c
 		return nil
 	}
 
-	return w.addReadRequest(conn)
+	return w.addReadRequest(conn, false)
 }
 
 func (w *readWriteWorkerImpl) writeData(conn *connection) error {
@@ -160,7 +178,7 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 		forkedConn := w.connectionManager.fork(conn, true)
 		forkedConn.localAddr = w.localAddr
 
-		err := w.addReadRequest(conn)
+		err := w.addReadRequest(conn, false)
 		if err != nil {
 			return err
 		}
@@ -169,7 +187,7 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 	}
 
 	if cqe.Flags()&iouring.CQEFSockNonempty > 0 && !conn.isClosed() {
-		return w.addReadRequest(conn)
+		return w.addReadRequest(conn, false)
 	}
 
 	if w.asyncHandler {
@@ -183,6 +201,20 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 		if conn.OutboundBuffered() > 0 {
 			return w.writeData(conn)
 		}
+		closed := conn.isClosed()
+
+		err := w.addReadRequest(conn, closed)
+		if err != nil {
+			return err
+		}
+
+		if closed {
+			err = w.addCloseConnRequest(conn)
+
+			return err
+		}
+
+		return nil
 	}
 
 	return nil
@@ -197,7 +229,7 @@ func newReadWriteWorkerImpl(ring *iouring.Ring, index int, localAddr net.Addr, e
 		writer:            newWriter(ring, config.sendRecvMsg),
 		ring:              ring,
 		connectionManager: connectionManager,
-		writeQueue:        queue.NewQueue[*connection](),
+		asyncOpQueue:      queue.NewQueue[*connection](),
 		eventHandler:      eventHandler,
 		asyncHandler:      config.asyncHandler,
 		goroutinePool:     config.goroutinePool,
