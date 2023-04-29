@@ -63,13 +63,11 @@ func (w *readWriteWorkerImpl) handleAsyncWrites() {
 		}
 		conn := w.asyncOpQueue.Dequeue()
 
-		closed := conn.isClosed()
-
 		var err error
 
 		switch conn.nextAsyncOp {
 		case readOp:
-			err = w.addReadRequest(conn, closed)
+			err = w.addReadRequest(conn)
 			if err != nil {
 				w.logError(err).Int("fd", conn.fd)
 
@@ -77,6 +75,8 @@ func (w *readWriteWorkerImpl) handleAsyncWrites() {
 			}
 
 		case writeOp:
+			closed := conn.isClosed()
+
 			if w.sendRecvMsg {
 				conn.setMsgHeaderWrite()
 			}
@@ -87,14 +87,14 @@ func (w *readWriteWorkerImpl) handleAsyncWrites() {
 
 				continue
 			}
-		}
 
-		if closed {
-			err = w.addCloseConnRequest(conn)
-			if err != nil {
-				w.logError(err).Int("fd", conn.fd)
+			if closed {
+				err = w.addCloseConnRequest(conn)
+				if err != nil {
+					w.logError(err).Int("fd", conn.fd)
 
-				continue
+					continue
+				}
 			}
 		}
 	}
@@ -111,7 +111,7 @@ func (w *readWriteWorkerImpl) doAsyncWork(conn *connection) func() {
 
 		if conn.OutboundBuffered() > 0 {
 			conn.nextAsyncOp = writeOp
-		} else {
+		} else if !conn.isClosed() {
 			conn.nextAsyncOp = readOp
 		}
 
@@ -130,7 +130,7 @@ func (w *readWriteWorkerImpl) onWrite(cqe *iouring.CompletionQueueEvent, conn *c
 		return nil
 	}
 
-	return w.addReadRequest(conn, false)
+	return w.addReadRequest(conn)
 }
 
 func (w *readWriteWorkerImpl) writeData(conn *connection) error {
@@ -178,7 +178,7 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 		forkedConn := w.connectionManager.fork(conn, true)
 		forkedConn.localAddr = w.localAddr
 
-		err := w.addReadRequest(conn, false)
+		err := w.addReadRequest(conn)
 		if err != nil {
 			return err
 		}
@@ -187,7 +187,7 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 	}
 
 	if cqe.Flags()&iouring.CQEFSockNonempty > 0 && !conn.isClosed() {
-		return w.addReadRequest(conn, false)
+		return w.addReadRequest(conn)
 	}
 
 	if w.asyncHandler {
@@ -200,21 +200,12 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 		w.work(conn)
 		if conn.OutboundBuffered() > 0 {
 			return w.writeData(conn)
+		} else if !conn.isClosed() {
+			err := w.addReadRequest(conn)
+			if err != nil {
+				return err
+			}
 		}
-		closed := conn.isClosed()
-
-		err := w.addReadRequest(conn, closed)
-		if err != nil {
-			return err
-		}
-
-		if closed {
-			err = w.addCloseConnRequest(conn)
-
-			return err
-		}
-
-		return nil
 	}
 
 	return nil

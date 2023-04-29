@@ -25,7 +25,7 @@ type reader struct {
 	recvMsg bool
 }
 
-func (r *reader) addReadRequest(conn *connection, link bool) error {
+func (r *reader) addReadRequest(conn *connection) error {
 	entry, err := r.ring.GetSQE()
 	if err != nil {
 		return fmt.Errorf("error getting SQE: %w", err)
@@ -43,10 +43,6 @@ func (r *reader) addReadRequest(conn *connection, link bool) error {
 			uint32(conn.inboundBuffer.Available()),
 			0)
 		entry.UserData = readDataFlag | uint64(conn.fd)
-	}
-
-	if link {
-		entry.Flags |= iouring.SqeIOLink
 	}
 
 	conn.state = connRead
