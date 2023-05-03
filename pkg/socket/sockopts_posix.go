@@ -54,7 +54,6 @@ func SetReuseport(fd, reusePort int) error {
 
 // SetReuseAddr enables SO_REUSEADDR option on socket.
 func SetReuseAddr(fd, reuseAddr int) error {
-	// fmt.Println("Reuse addr")
 	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, reuseAddr))
 }
 

@@ -70,45 +70,97 @@ var defaultTestOnReadCallback = func(c gain.Conn) {
 	}
 }
 
-type testServerHandler struct {
-	onStartCallback onStartCallback
-	onOpenCallback  onOpenCallback
-	onReadCallback  onReadCallback
-	onWriteCallback onWriteCallback
-	onCloseCallback onCloseCallback
+type callbacksHolder struct {
+	onStartCallback  onStartCallback
+	onAcceptCallback onAcceptCallback
+	onReadCallback   onReadCallback
+	onWriteCallback  onWriteCallback
+	onCloseCallback  onCloseCallback
+}
 
-	startedWg *sync.WaitGroup
+type testServerHandler struct {
+	callbacksHolder
+
+	onStartCount  atomic.Uint32
+	onAcceptCount atomic.Uint32
+	onReadCount   atomic.Uint32
+	onWriteCount  atomic.Uint32
+	onCloseCount  atomic.Uint32
+
+	startedWg  *sync.WaitGroup
+	onAcceptWg *sync.WaitGroup
+	onReadWg   *sync.WaitGroup
+	onWriteWg  *sync.WaitGroup
+	onCloseWg  *sync.WaitGroup
+
+	finished atomic.Bool
 }
 
 func (h *testServerHandler) OnStart(server gain.Server) {
-	h.startedWg.Done()
+	if !h.finished.Load() {
+		h.startedWg.Done()
 
-	if h.onStartCallback != nil {
-		h.onStartCallback(server)
+		if h.onStartCallback != nil {
+			h.onStartCallback(server)
+		}
+
+		h.onStartCount.Add(1)
 	}
 }
 
-func (h *testServerHandler) OnOpen(c gain.Conn) {
-	if h.onOpenCallback != nil {
-		h.onOpenCallback(c)
+func (h *testServerHandler) OnAccept(c gain.Conn) {
+	if !h.finished.Load() {
+		if h.onAcceptCallback != nil {
+			h.onAcceptCallback(c)
+		}
+
+		h.onAcceptCount.Add(1)
+
+		if h.onAcceptWg != nil {
+			h.onAcceptWg.Done()
+		}
 	}
 }
 
-func (h *testServerHandler) OnClose(c gain.Conn) {
-	if h.onCloseCallback != nil {
-		h.onCloseCallback(c)
+func (h *testServerHandler) OnClose(c gain.Conn, err error) {
+	if !h.finished.Load() {
+		if h.onCloseCallback != nil {
+			h.onCloseCallback(c, err)
+		}
+
+		h.onCloseCount.Add(1)
+
+		if h.onCloseWg != nil {
+			h.onCloseWg.Done()
+		}
 	}
 }
 
 func (h *testServerHandler) OnRead(conn gain.Conn) {
-	if h.onReadCallback != nil {
-		h.onReadCallback(conn)
+	if !h.finished.Load() {
+		if h.onReadCallback != nil {
+			h.onReadCallback(conn)
+		}
+
+		h.onReadCount.Add(1)
+
+		if h.onReadWg != nil {
+			h.onReadWg.Done()
+		}
 	}
 }
 
 func (h *testServerHandler) OnWrite(c gain.Conn) {
-	if h.onWriteCallback != nil {
-		h.onWriteCallback(c)
+	if !h.finished.Load() {
+		if h.onWriteCallback != nil {
+			h.onWriteCallback(c)
+		}
+
+		h.onWriteCount.Add(1)
+
+		if h.onWriteWg != nil {
+			h.onWriteWg.Done()
+		}
 	}
 }
 
@@ -215,7 +267,7 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 	if testConfig.waitForDialAllClients {
 		clientConnectWG := new(sync.WaitGroup)
 		clientConnectWG.Add(testConfig.numberOfClients)
-		testHandler.onOpenCallback = func(c gain.Conn) {
+		testHandler.onAcceptCallback = func(c gain.Conn) {
 			clientConnectWG.Done()
 		}
 
@@ -246,7 +298,7 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 		}
 		clientRWWG.Add(testConfig.numberOfClients * testConfig.writesCount)
 		if testConfig.protocol == gainNet.TCP {
-			testHandler.onOpenCallback = func(c gain.Conn) {
+			testHandler.onAcceptCallback = func(c gain.Conn) {
 				clientConnectWG.Done()
 			}
 		}
@@ -344,12 +396,18 @@ func testCloseServer(t *testing.T, network string, architecture gain.ServerArchi
 	clientsGroup := newTestConnClientGroup(t, network, port, 10)
 	clientsGroup.Dial()
 
-	data := make([]byte, 1024)
+	data := make([]byte, 512)
+
 	_, err := rand.Read(data)
 	Nil(t, err)
+	clientsGroup.SetDeadline(time.Now().Add(time.Millisecond * 500))
 	clientsGroup.Write(data)
-	buffer := make([]byte, 1024)
+	buffer := make([]byte, 512)
+
+	clientsGroup.SetDeadline(time.Now().Add(time.Millisecond * 500))
 	clientsGroup.Read(buffer)
+
+	clientsGroup.SetDeadline(time.Time{})
 
 	testHandler.waitForWrites()
 	clientsGroup.Close()
@@ -379,20 +437,22 @@ func testCloseServerWithConnectedClients(t *testing.T, architecture gain.ServerA
 	server.Close()
 }
 
-func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitecture) {
+func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitecture, justClose bool) {
 	t.Helper()
 	testHandler := newTestServerHandler(func(conn gain.Conn) {
-		buf, err := conn.Next(-1)
-		if err != nil {
-			log.Panic(err)
+		if !justClose {
+			buf, err := conn.Next(-1)
+			if err != nil {
+				log.Panic(err)
+			}
+
+			_, err = conn.Write(buf)
+			if err != nil {
+				log.Panic(err)
+			}
 		}
 
-		_, err = conn.Write(buf)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		err = conn.Close()
+		err := conn.Close()
 		if err != nil {
 			log.Panic(err)
 		}
@@ -414,13 +474,17 @@ func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitectur
 		Equal(t, len(testData), bytesN)
 		buffer := make([]byte, len(testData))
 		bytesN, cErr = conn.Read(buffer)
-		Nil(t, cErr)
-		Equal(t, len(testData), bytesN)
-		Equal(t, testData, buffer)
-		bytesN, cErr = conn.Write(testData)
-		Nil(t, cErr)
-		Equal(t, len(testData), bytesN)
-		bytesN, cErr = conn.Read(buffer)
+
+		if !justClose {
+			Nil(t, cErr)
+			Equal(t, len(testData), bytesN)
+			Equal(t, testData, buffer)
+			bytesN, cErr = conn.Write(testData)
+			Nil(t, cErr)
+			Equal(t, len(testData), bytesN)
+			bytesN, cErr = conn.Read(buffer)
+		}
+
 		Equal(t, io.EOF, cErr)
 		Equal(t, 0, bytesN)
 		wg.Done()
@@ -480,8 +544,8 @@ func testLargeRead(t *testing.T, network string, architecture gain.ServerArchite
 func testMultipleReads(t *testing.T, network string, asyncHandler bool, architecture gain.ServerArchitecture) {
 	t.Helper()
 
-	doublePageSize := os.Getpagesize()
-	data := make([]byte, doublePageSize)
+	pageSize := os.Getpagesize()
+	data := make([]byte, pageSize)
 	_, err := rand.Read(data)
 	Nil(t, err)
 
@@ -493,17 +557,16 @@ func testMultipleReads(t *testing.T, network string, asyncHandler bool, architec
 
 	doneWg.Add(int(expectedReads))
 	onReadCallback := func(c gain.Conn) {
-		readBuffer := make([]byte, doublePageSize)
+		readBuffer := make([]byte, pageSize)
 
 		n, cErr := c.Read(readBuffer)
 		if err != nil {
 			log.Panic(cErr)
 		}
 
-		doneWg.Done()
-		Equal(t, doublePageSize, n)
-
 		readsCount.Add(1)
+		doneWg.Done()
+		Equal(t, pageSize, n)
 	}
 
 	testConnHandler := newTestServerHandler(onReadCallback)
@@ -515,7 +578,7 @@ func testMultipleReads(t *testing.T, network string, asyncHandler bool, architec
 	go func() {
 		for i := 0; i < int(expectedReads); i++ {
 			clientsGroup.Write(data)
-			time.Sleep(time.Millisecond * 200)
+			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 

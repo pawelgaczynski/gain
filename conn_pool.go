@@ -43,7 +43,9 @@ func (c *connectionPool) Put(conn *connection) {
 	conn.state = 0
 	conn.msgHdr = nil
 	conn.rawSockaddr = nil
-	conn.mode = 0
+	conn.mode.Store(0)
+	conn.closed.Store(false)
+	conn.network = 0
 	conn.ctx = nil
 
 	c.internalPool.Put(conn)

@@ -176,11 +176,19 @@ func TestShardingReleasingUDPConns(t *testing.T) {
 }
 
 func TestShardingTCPCloseConnSync(t *testing.T) {
-	testCloseConn(t, false, gain.SocketSharding)
+	testCloseConn(t, false, gain.SocketSharding, false)
 }
 
 func TestShardingTCPCloseConnAsync(t *testing.T) {
-	testCloseConn(t, true, gain.SocketSharding)
+	testCloseConn(t, true, gain.SocketSharding, false)
+}
+
+func TestShardingTCPOnlyCloseConnSync(t *testing.T) {
+	testCloseConn(t, false, gain.SocketSharding, true)
+}
+
+func TestShardingTCPOnlyCloseConnAsync(t *testing.T) {
+	testCloseConn(t, true, gain.SocketSharding, true)
 }
 
 func TestShardingTCPConnAddress(t *testing.T) {

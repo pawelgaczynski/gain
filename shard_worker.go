@@ -44,6 +44,13 @@ type shardWorker struct {
 }
 
 func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
+	err := w.addAcceptConnRequest()
+	if err != nil {
+		w.accepting.Store(false)
+
+		return fmt.Errorf("add accept() request error: %w", err)
+	}
+
 	fileDescriptor := int(cqe.Res())
 	w.logDebug().Int("fd", fileDescriptor).Msg("Connection accepted")
 
@@ -54,41 +61,31 @@ func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
 	conn.fd = fileDescriptor
 	conn.localAddr = w.localAddr
 
-	if clientAddr, err := w.acceptor.lastClientAddr(); err == nil {
+	var clientAddr net.Addr
+	if clientAddr, err = w.acceptor.lastClientAddr(); err == nil {
 		conn.remoteAddr = clientAddr
 	} else {
 		w.logError(err).Msg("get last client address failed")
 	}
 
 	if w.cpuAffinity {
-		err := unix.SetsockoptInt(fileDescriptor, unix.SOL_SOCKET, unix.SO_INCOMING_CPU, w.index()+1)
+		err = unix.SetsockoptInt(fileDescriptor, unix.SOL_SOCKET, unix.SO_INCOMING_CPU, w.index()+1)
 		if err != nil {
 			return fmt.Errorf("fd: %d, setting SO_INCOMING_CPU error: %w", fileDescriptor, err)
 		}
 	}
 
 	if w.tcpKeepAlive > 0 {
-		err := socket.SetKeepAlivePeriod(fileDescriptor, int(w.tcpKeepAlive.Seconds()))
+		err = socket.SetKeepAlivePeriod(fileDescriptor, int(w.tcpKeepAlive.Seconds()))
 		if err != nil {
 			return fmt.Errorf("fd: %d, setting tcpKeepAlive error: %w", fileDescriptor, err)
 		}
 	}
 
-	err := w.addReadRequest(conn)
-	if err != nil {
-		return fmt.Errorf("add read request error: %w", err)
-	}
+	conn.setUserSpace()
+	w.eventHandler.OnAccept(conn)
 
-	w.eventHandler.OnOpen(conn)
-
-	err = w.addAcceptConnRequest()
-	if err != nil {
-		w.accepting.Store(false)
-
-		return fmt.Errorf("add accept() request error: %w", err)
-	}
-
-	return nil
+	return w.addNextRequest(conn)
 }
 
 func (w *shardWorker) stopAccept() error {
@@ -123,19 +120,33 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 	case connWrite:
 		if !w.connectionProtocol && conn.key == 1 {
 			errMsg = "main socket cannot be in write mode"
+
+			break
 		}
 
+		conn.onKernelWrite(int(cqe.Res()))
+		w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+
+		conn.setUserSpace()
 		w.eventHandler.OnWrite(conn)
 
-		err = w.onWrite(cqe, conn)
+		if w.sendRecvMsg {
+			w.connectionManager.release(conn.key)
+
+			break
+		}
+
+		err = w.addNextRequest(conn)
 		if err != nil {
-			errMsg = "write error"
+			errMsg = "add request error"
 		}
 
 	case connClose:
 		if cqe.UserData()&closeConnFlag > 0 {
-			w.eventHandler.OnClose(conn)
-			w.connectionManager.release(conn.key)
+			w.closeConn(conn, false, nil)
+		} else if cqe.UserData()&writeDataFlag > 0 {
+			conn.setUserSpace()
+			w.eventHandler.OnWrite(conn)
 		}
 
 	default:
@@ -144,7 +155,8 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 
 	if err != nil {
 		w.logError(err).Msg(errMsg)
-		_ = w.syscallCloseSocket(conn.fd)
+
+		w.closeConn(conn, true, err)
 	}
 }
 
@@ -242,7 +254,7 @@ func (w *shardWorker) loop(fd int) error {
 	return loopErr
 }
 
-func (w *shardWorker) closeConnsAndRings() {
+func (w *shardWorker) closeAllConnsAndRings() {
 	w.logWarn().Msg("Closing connections")
 	w.accepting.Store(false)
 	_ = w.syscallCloseSocket(w.fd)
@@ -277,7 +289,7 @@ func newShardWorker(
 		connectionProtocol: connectionProtocol,
 		acceptor:           newAcceptor(ring, connectionManager),
 	}
-	worker.onCloseHandler = worker.closeConnsAndRings
+	worker.onCloseHandler = worker.closeAllConnsAndRings
 
 	return worker, nil
 }

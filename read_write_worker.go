@@ -15,6 +15,8 @@
 package gain
 
 import (
+	"fmt"
+	"io"
 	"net"
 
 	"github.com/alitto/pond"
@@ -96,6 +98,14 @@ func (w *readWriteWorkerImpl) handleAsyncWrites() {
 					continue
 				}
 			}
+
+		case closeOp:
+			err = w.addCloseConnRequest(conn)
+			if err != nil {
+				w.logError(err).Int("fd", conn.fd)
+
+				continue
+			}
 		}
 	}
 }
@@ -109,28 +119,17 @@ func (w *readWriteWorkerImpl) doAsyncWork(conn *connection) func() {
 	return func() {
 		w.work(conn)
 
-		if conn.OutboundBuffered() > 0 {
+		switch {
+		case conn.OutboundBuffered() > 0:
 			conn.nextAsyncOp = writeOp
-		} else if !conn.isClosed() {
+		case conn.isClosed():
+			conn.nextAsyncOp = closeOp
+		default:
 			conn.nextAsyncOp = readOp
 		}
 
 		w.asyncOpQueue.Enqueue(conn)
 	}
-}
-
-func (w *readWriteWorkerImpl) onWrite(cqe *iouring.CompletionQueueEvent, conn *connection) error {
-	conn.onKernelWrite(int(cqe.Res()))
-	w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
-
-	if w.sendRecvMsg {
-		w.eventHandler.OnClose(conn)
-		w.connectionManager.release(conn.key)
-
-		return nil
-	}
-
-	return w.addReadRequest(conn)
 }
 
 func (w *readWriteWorkerImpl) writeData(conn *connection) error {
@@ -145,9 +144,7 @@ func (w *readWriteWorkerImpl) writeData(conn *connection) error {
 	}
 
 	if closed {
-		err = w.addCloseConnRequest(conn)
-
-		return err
+		return w.addCloseConnRequest(conn)
 	}
 
 	return nil
@@ -163,9 +160,7 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 	// When such a datagram is received, the return value is 0.
 	// The value 0 may also be returned if the requested number of bytes to receive from a stream socket was 0.
 	if cqe.Res() <= 0 {
-		_ = w.syscallCloseSocket(conn.fd)
-		w.eventHandler.OnClose(conn)
-		w.connectionManager.release(conn.key)
+		w.closeConn(conn, true, io.EOF)
 
 		return nil
 	}
@@ -198,9 +193,16 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 		}
 	} else {
 		w.work(conn)
-		if conn.OutboundBuffered() > 0 {
+
+		switch {
+		case conn.OutboundBuffered() > 0:
 			return w.writeData(conn)
-		} else if !conn.isClosed() {
+		case conn.isClosed():
+			err := w.addCloseConnRequest(conn)
+			if err != nil {
+				return err
+			}
+		default:
 			err := w.addReadRequest(conn)
 			if err != nil {
 				return err
@@ -209,6 +211,54 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 	}
 
 	return nil
+}
+
+func (w *readWriteWorkerImpl) addNextRequest(conn *connection) error {
+	closed := conn.isClosed()
+
+	switch {
+	case conn.OutboundBuffered() > 0:
+		err := w.addWriteRequest(conn, closed)
+		if err != nil {
+			return fmt.Errorf("add read() request error: %w", err)
+		}
+
+		if closed {
+			err = w.addCloseConnRequest(conn)
+			if err != nil {
+				return fmt.Errorf("add close() request error: %w", err)
+			}
+		}
+
+	case closed:
+		err := w.addCloseConnRequest(conn)
+		if err != nil {
+			return fmt.Errorf("add close() request error: %w", err)
+		}
+
+	default:
+		err := w.addReadRequest(conn)
+		if err != nil {
+			return fmt.Errorf("add read() request error: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (w *readWriteWorkerImpl) closeConn(conn *connection, syscallClose bool, err error) {
+	if syscallClose {
+		_ = w.syscallCloseSocket(conn.fd)
+	}
+
+	conn.setUserSpace()
+
+	if !conn.isClosed() {
+		conn.Close()
+	}
+
+	w.eventHandler.OnClose(conn, err)
+	w.connectionManager.release(conn.key)
 }
 
 func newReadWriteWorkerImpl(ring *iouring.Ring, index int, localAddr net.Addr, eventHandler EventHandler,

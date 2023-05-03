@@ -338,10 +338,18 @@ func (e *engine) start(mainProcess bool, address string) error {
 }
 
 func (e *engine) StartAsMainProcess(address string) error {
+	if e.IsRunning() {
+		return gainErrors.ErrServerAlreadyRunning
+	}
+
 	return e.start(true, address)
 }
 
 func (e *engine) Start(address string) error {
+	if e.IsRunning() {
+		return gainErrors.ErrServerAlreadyRunning
+	}
+
 	return e.start(false, address)
 }
 

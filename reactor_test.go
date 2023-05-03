@@ -102,11 +102,19 @@ func TestReactorCloseSeverWithConnectedClients(t *testing.T) {
 }
 
 func TestReactorTCPCloseConnSync(t *testing.T) {
-	testCloseConn(t, false, gain.Reactor)
+	testCloseConn(t, false, gain.Reactor, false)
 }
 
 func TestReactorTCPCloseConnAsync(t *testing.T) {
-	testCloseConn(t, true, gain.Reactor)
+	testCloseConn(t, true, gain.Reactor, false)
+}
+
+func TestReactorTCPOnlyCloseConnSync(t *testing.T) {
+	testCloseConn(t, false, gain.Reactor, true)
+}
+
+func TestReactorTCPOnlyCloseConnAsync(t *testing.T) {
+	testCloseConn(t, true, gain.Reactor, true)
 }
 
 func TestReactorTCPConnAddress(t *testing.T) {

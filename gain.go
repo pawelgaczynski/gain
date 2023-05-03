@@ -15,27 +15,41 @@
 //nolint:revive
 package gain
 
+import "fmt"
+
 type EventHandler interface {
 	// OnStart fires when the server is ready for accepting new connections.
 	OnStart(server Server)
-	// OnOpen fires when a new connection has been opened.
+	// OnAccept fires when a new TCP connection has been opened (will not be fired for UDP protocol).
+	// This is good place to set the socket options, such as TCP keepalive.
+	// The incoming data buffer of the connection will be empty,
+	// so the attempt to read the data will never succeed, but you can perform a write at this point
 	// The Conn c has information about the connection such as it's local and remote address.
-	OnOpen(c Conn)
+	OnAccept(c Conn)
 	// OnRead fires when a socket receives data from the peer.
-	// Call c.Read() of Conn c to read incoming data from the peer.
+	// Call c.Read() of Conn c to read incoming data from the peer. call c.Write() to send data to the remote peer.
 	OnRead(c Conn)
 	// OnWrite fires right after a packet is written to the peer socket.
 	OnWrite(c Conn)
-	// OnClose fires when a connection has been closed.
-	OnClose(c Conn)
+	// OnClose fires when a TCP connection has been closed (will not be fired for UDP protocol).
+	// The parameter err is the last known connection error.
+	OnClose(c Conn, err error)
 }
 
 // DefaultEventHandler is a default implementation for all of the EventHandler callbacks (do nothing).
 // Compose it with your own implementation of EventHandler and you won't need to implement all callbacks.
 type DefaultEventHandler struct{}
 
-func (e DefaultEventHandler) OnStart(server Server) {}
-func (e DefaultEventHandler) OnOpen(c Conn)         {}
-func (e DefaultEventHandler) OnClose(c Conn)        {}
-func (e DefaultEventHandler) OnRead(c Conn)         {}
-func (e DefaultEventHandler) OnWrite(c Conn)        {}
+func (e DefaultEventHandler) OnStart(server Server)     {}
+func (e DefaultEventHandler) OnAccept(c Conn)           {}
+func (e DefaultEventHandler) OnClose(c Conn, err error) {}
+func (e DefaultEventHandler) OnRead(c Conn)             {}
+func (e DefaultEventHandler) OnWrite(c Conn)            {}
+
+// ListenAndServe starts a server with a given address and event handler.
+// The server can be configured with additional options.
+func ListenAndServe(address string, eventHandler EventHandler, options ...ConfigOption) error {
+	server := NewServer(eventHandler, NewConfig(options...))
+
+	return fmt.Errorf("starting server error: %w", server.Start(address))
+}

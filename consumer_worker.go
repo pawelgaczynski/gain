@@ -59,7 +59,7 @@ func (c *consumerWorker) addConnToQueue(fd int) error {
 	return nil
 }
 
-func (c *consumerWorker) closeConns() {
+func (c *consumerWorker) closeAllConns() {
 	c.logWarn().Msg("Closing connections")
 	c.connectionManager.close(func(conn *connection) bool {
 		err := c.addCloseConnRequest(conn)
@@ -91,17 +91,23 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 		}
 
 	case connWrite:
+		conn.onKernelWrite(int(cqe.Res()))
+		c.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+
+		conn.setUserSpace()
 		c.eventHandler.OnWrite(conn)
 
-		err = c.onWrite(cqe, conn)
+		err = c.addNextRequest(conn)
 		if err != nil {
-			errMsg = "write error"
+			errMsg = "add request error"
 		}
 
 	case connClose:
 		if cqe.UserData()&closeConnFlag > 0 {
-			c.eventHandler.OnClose(conn)
-			c.connectionManager.release(conn.key)
+			c.closeConn(conn, false, nil)
+		} else if cqe.UserData()&writeDataFlag > 0 {
+			conn.setUserSpace()
+			c.eventHandler.OnWrite(conn)
 		}
 
 	default:
@@ -110,7 +116,7 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 
 	if err != nil {
 		c.logError(err).Msg(errMsg)
-		_ = c.syscallCloseSocket(conn.fd)
+		c.closeConn(conn, true, err)
 	}
 }
 
@@ -138,14 +144,13 @@ func (c *consumerWorker) getConnsFromQueue() {
 			c.logError(gainErrors.ErrorAddressNotFound(fd)).Msg("Get new connection error")
 		}
 
-		err := c.addReadRequest(conn)
+		conn.setUserSpace()
+		c.eventHandler.OnAccept(conn)
+
+		err := c.addNextRequest(conn)
 		if err != nil {
-			c.logError(err).Msg("Add read() request for new connection error")
-
-			continue
+			c.logError(err).Msg("add request error")
 		}
-
-		c.eventHandler.OnOpen(conn)
 	}
 }
 
@@ -209,16 +214,10 @@ func (c *consumerWorker) loop(_ int) error {
 				c.logError(gainErrors.ErrorAddressNotFound(conn.fd)).Msg("Get new connection error")
 			}
 
-			err := c.addReadRequest(conn)
-			if err != nil {
-				c.logError(err).Msg("Add read() request for new connection error")
-				_ = c.syscallCloseSocket(fileDescriptor)
+			conn.setUserSpace()
+			c.eventHandler.OnAccept(conn)
 
-				return nil
-			}
-			c.eventHandler.OnOpen(conn)
-
-			return nil
+			return c.addNextRequest(conn)
 		}
 		fileDescriptor := int(cqe.UserData() & ^allFlagsMask)
 		if fileDescriptor < syscall.Stderr {
@@ -258,7 +257,7 @@ func newConsumerWorker(
 	if !features.ringsMessaging {
 		consumer.connQueue = queue.NewIntQueue()
 	}
-	consumer.onCloseHandler = consumer.closeConns
+	consumer.onCloseHandler = consumer.closeAllConns
 
 	return consumer, nil
 }

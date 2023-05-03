@@ -19,6 +19,7 @@ package gain
 import (
 	"io"
 	"net"
+	"time"
 )
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
@@ -67,12 +68,50 @@ type Writer interface {
 	OutboundBuffered() (n int)
 }
 
+// Socket is an interface that represents a socket.
+type Socket interface {
+	// Fd returns underlying file descriptor.
+	Fd() int
+
+	// SetReadBuffer sets the size of the operating system's
+	// receive buffer associated with the connection.
+	SetReadBuffer(bytes int) error
+
+	// SetWriteBuffer sets the size of the operating system's
+	// transmit buffer associated with the connection.
+	SetWriteBuffer(bytes int) error
+	// SetLinger sets the behavior of Close on a connection which still
+	// has data waiting to be sent or to be acknowledged.
+	//
+	// If sec < 0 (the default), the operating system finishes sending the
+	// data in the background.
+	//
+	// If sec == 0, the operating system discards any unsent or
+	// unacknowledged data.
+	//
+	// If sec > 0, the data is sent in the background as with sec < 0. On
+	// some operating systems after sec seconds have elapsed any remaining
+	// unsent data may be discarded.
+	SetLinger(sec int) error
+
+	// SetKeepAlivePeriod tells operating system to send keep-alive messages on the connection
+	// and sets period between TCP keep-alive probes.
+	SetKeepAlivePeriod(d time.Duration) error
+
+	// SetNoDelay controls whether the operating system should delay
+	// packet transmission in hopes of sending fewer packets (Nagle's
+	// algorithm).
+	// The default is true (no delay), meaning that data is sent as soon as possible after a Write.
+	SetNoDelay(noDelay bool) error
+}
+
 // Conn is an interface representing a network connection.
 // Structures implementing it are not guaranteed to be thread-safe.
 // All write operations are asynchronous.
 type Conn interface {
 	Reader
 	Writer
+	Socket
 
 	// Context returns a user-defined context.
 	Context() (ctx interface{})
@@ -88,7 +127,4 @@ type Conn interface {
 
 	// Close closes the current connection.
 	Close() error
-
-	// Fd() returns underlying file descriptor.
-	Fd() int
 }

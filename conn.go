@@ -20,6 +20,7 @@ import (
 	"net"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/pawelgaczynski/gain/pkg/buffer/magicring"
@@ -54,24 +55,21 @@ func (s connectionState) String() string {
 	}
 }
 
+const (
+	kernelSpace = iota
+	userSpace
+)
+
 func connModeString(m uint32) string {
 	switch m {
 	case kernelSpace:
-		return "readKernel"
+		return "kernelSpace"
 	case userSpace:
-		return "readOrWriteUser"
-	case closed:
-		return "closed"
+		return "userSpace"
 	default:
 		return "invalid"
 	}
 }
-
-const (
-	kernelSpace = iota
-	userSpace
-	closed
-)
 
 const (
 	msgControlBufferSize = 64
@@ -81,16 +79,24 @@ const (
 	noOp = iota
 	readOp
 	writeOp
+	closeOp
+)
+
+const (
+	tcp = iota
+	udp
 )
 
 type connection struct {
-	fd  int
-	key int
+	fd      int
+	key     int
+	network uint32
 
 	inboundBuffer  *magicring.RingBuffer
 	outboundBuffer *magicring.RingBuffer
 	state          connectionState
-	mode           uint32
+	mode           atomic.Uint32
+	closed         atomic.Bool
 
 	msgHdr      *syscall.Msghdr
 	rawSockaddr *syscall.RawSockaddrAny
@@ -112,11 +118,11 @@ func (c *connection) inboundWriteAddress() unsafe.Pointer {
 }
 
 func (c *connection) setKernelSpace() {
-	atomic.StoreUint32(&c.mode, kernelSpace)
+	c.mode.Store(kernelSpace)
 }
 
 func (c *connection) setUserSpace() {
-	atomic.StoreUint32(&c.mode, userSpace)
+	c.mode.Store(userSpace)
 }
 
 func (c *connection) Context() interface{} {
@@ -139,6 +145,59 @@ func (c *connection) Fd() int {
 	return c.fd
 }
 
+func (c *connection) userOpAllowed(name string) error {
+	if c.closed.Load() {
+		return errors.ErrConnectionClosed
+	}
+
+	if mode := c.mode.Load(); mode != userSpace {
+		return errors.ErrorOpNotAvailableInMode(name, connModeString(mode))
+	}
+
+	return nil
+}
+
+func (c *connection) SetReadBuffer(bytes int) error {
+	//nolint:wrapcheck
+	return socket.SetRecvBuffer(c.fd, bytes)
+}
+
+func (c *connection) SetWriteBuffer(bytes int) error {
+	err := c.userOpAllowed("setWriteBuffer")
+	if err != nil {
+		return err
+	}
+	//nolint:wrapcheck
+	return socket.SetSendBuffer(c.fd, bytes)
+}
+
+func (c *connection) SetLinger(sec int) error {
+	err := c.userOpAllowed("setLinger")
+	if err != nil {
+		return err
+	}
+	//nolint:wrapcheck
+	return socket.SetLinger(c.fd, sec)
+}
+
+func (c *connection) SetNoDelay(noDelay bool) error {
+	err := c.userOpAllowed("setNoDelay")
+	if err != nil {
+		return err
+	}
+	//nolint:wrapcheck
+	return socket.SetNoDelay(c.fd, boolToInt(noDelay))
+}
+
+func (c *connection) SetKeepAlivePeriod(period time.Duration) error {
+	err := c.userOpAllowed("setKeepAlivePeriod")
+	if err != nil {
+		return err
+	}
+	//nolint:wrapcheck
+	return socket.SetKeepAlivePeriod(c.fd, int(period.Seconds()))
+}
+
 func (c *connection) onKernelRead(n int) {
 	c.inboundBuffer.AdvanceWrite(n)
 }
@@ -148,22 +207,27 @@ func (c *connection) onKernelWrite(n int) {
 }
 
 func (c *connection) isClosed() bool {
-	return atomic.LoadUint32(&c.mode) == closed
+	return c.closed.Load()
 }
 
 func (c *connection) Close() error {
-	if mode := atomic.LoadUint32(&c.mode); mode == closed {
+	if network := atomic.LoadUint32(&c.network); network == udp {
+		return nil
+	}
+
+	if c.closed.Load() {
 		return errors.ErrConnectionAlreadyClosed
 	}
 
-	atomic.StoreUint32(&c.mode, closed)
+	c.closed.Store(true)
 
 	return nil
 }
 
 func (c *connection) Next(n int) ([]byte, error) {
-	if mode := atomic.LoadUint32(&c.mode); mode != userSpace {
-		return nil, errors.ErrorOpNotAvailableInMode("next", connModeString(mode))
+	err := c.userOpAllowed("next")
+	if err != nil {
+		return nil, err
 	}
 
 	bytes, err := c.inboundBuffer.Next(n)
@@ -175,27 +239,30 @@ func (c *connection) Next(n int) ([]byte, error) {
 }
 
 func (c *connection) Discard(n int) (int, error) {
-	if mode := atomic.LoadUint32(&c.mode); mode != userSpace {
-		return 0, errors.ErrorOpNotAvailableInMode("discard", connModeString(mode))
+	err := c.userOpAllowed("discard")
+	if err != nil {
+		return 0, err
 	}
 
 	return c.inboundBuffer.Discard(n), nil
 }
 
 func (c *connection) Peek(n int) ([]byte, error) {
-	if mode := atomic.LoadUint32(&c.mode); mode != userSpace {
-		return nil, errors.ErrorOpNotAvailableInMode("discard", connModeString(mode))
+	err := c.userOpAllowed("peek")
+	if err != nil {
+		return nil, err
 	}
 
 	return c.inboundBuffer.Peek(n), nil
 }
 
-func (c *connection) ReadFrom(r io.Reader) (int64, error) {
-	if mode := atomic.LoadUint32(&c.mode); mode != userSpace {
-		return 0, errors.ErrorOpNotAvailableInMode("readFrom", connModeString(mode))
+func (c *connection) ReadFrom(reader io.Reader) (int64, error) {
+	err := c.userOpAllowed("readFrom")
+	if err != nil {
+		return 0, err
 	}
 
-	bytesRead, err := c.outboundBuffer.ReadFrom(r)
+	bytesRead, err := c.outboundBuffer.ReadFrom(reader)
 	if err != nil {
 		return 0, fmt.Errorf("connection outbound buffer ReadFrom error: %w", err)
 	}
@@ -203,12 +270,13 @@ func (c *connection) ReadFrom(r io.Reader) (int64, error) {
 	return bytesRead, nil
 }
 
-func (c *connection) WriteTo(w io.Writer) (int64, error) {
-	if mode := atomic.LoadUint32(&c.mode); mode != userSpace {
-		return 0, errors.ErrorOpNotAvailableInMode("writeTo", connModeString(mode))
+func (c *connection) WriteTo(writer io.Writer) (int64, error) {
+	err := c.userOpAllowed("writeTo")
+	if err != nil {
+		return 0, err
 	}
 
-	bytesWritten, err := c.inboundBuffer.WriteTo(w)
+	bytesWritten, err := c.inboundBuffer.WriteTo(writer)
 	if err != nil {
 		return 0, fmt.Errorf("connection inbound buffer WriteTo error: %w", err)
 	}
@@ -217,8 +285,9 @@ func (c *connection) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (c *connection) Read(buffer []byte) (int, error) {
-	if mode := atomic.LoadUint32(&c.mode); mode != userSpace {
-		return -1, errors.ErrorOpNotAvailableInMode("read", connModeString(mode))
+	err := c.userOpAllowed("read")
+	if err != nil {
+		return 0, err
 	}
 
 	bytesRead, err := c.inboundBuffer.Read(buffer)
@@ -230,8 +299,9 @@ func (c *connection) Read(buffer []byte) (int, error) {
 }
 
 func (c *connection) Write(buffer []byte) (int, error) {
-	if mode := atomic.LoadUint32(&c.mode); mode != userSpace {
-		return 0, errors.ErrorOpNotAvailableInMode("write", connModeString(mode))
+	err := c.userOpAllowed("write")
+	if err != nil {
+		return 0, err
 	}
 
 	bytesWritten, err := c.outboundBuffer.Write(buffer)
@@ -286,6 +356,7 @@ func (c *connection) fork(newConn *connection, key int, write bool) *connection 
 	newConn.state = c.state
 	newConn.fd = c.fd
 	newConn.key = key
+	newConn.network = udp
 
 	if sockAddr, err := anyToSockaddr(newConn.rawSockaddr); err == nil {
 		newConn.remoteAddr = socket.SockaddrToUDPAddr(sockAddr)

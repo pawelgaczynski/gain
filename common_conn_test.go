@@ -85,15 +85,43 @@ func newConnServerTester(writeCount int, removeWGAfterMinWrites bool) *connServe
 	return connServerTester
 }
 
+func newEventHandlerTester(callbacks callbacksHolder) *testServerHandler {
+	testHandler := &testServerHandler{}
+
+	var (
+		startedWg  sync.WaitGroup
+		onAcceptWg sync.WaitGroup
+		onReadWg   sync.WaitGroup
+		onWriteWg  sync.WaitGroup
+		onCloseWg  sync.WaitGroup
+	)
+
+	startedWg.Add(1)
+	testHandler.startedWg = &startedWg
+	testHandler.onAcceptWg = &onAcceptWg
+	testHandler.onReadWg = &onReadWg
+	testHandler.onWriteWg = &onWriteWg
+	testHandler.onCloseWg = &onCloseWg
+
+	testHandler.onStartCallback = callbacks.onStartCallback
+	testHandler.onAcceptCallback = callbacks.onAcceptCallback
+	testHandler.onReadCallback = callbacks.onReadCallback
+	testHandler.onWriteCallback = callbacks.onWriteCallback
+	testHandler.onCloseCallback = callbacks.onCloseCallback
+
+	return testHandler
+}
+
 type testConnClient struct {
 	t       *testing.T
 	conn    net.Conn
 	network string
 	port    int
+	idx     int
 }
 
 func (c *testConnClient) Dial() {
-	conn, err := net.DialTimeout(c.network, fmt.Sprintf("localhost:%d", c.port), time.Second)
+	conn, err := net.DialTimeout(c.network, fmt.Sprintf("localhost:%d", c.port), time.Millisecond*500)
 	Nil(c.t, err)
 	NotNil(c.t, conn)
 	c.conn = conn
@@ -121,13 +149,14 @@ func (c *testConnClient) Read(buffer []byte) {
 	Equal(c.t, len(buffer), bytesRead)
 }
 
-func newTestConnClient(t *testing.T, network string, port int) *testConnClient {
+func newTestConnClient(t *testing.T, idx int, network string, port int) *testConnClient {
 	t.Helper()
 
 	return &testConnClient{
 		t:       t,
 		network: network,
 		port:    port,
+		idx:     idx,
 	}
 }
 
@@ -172,7 +201,7 @@ func newTestConnClientGroup(t *testing.T, network string, port int, n int) *test
 	}
 
 	for i := 0; i < n; i++ {
-		group.clients[i] = newTestConnClient(t, network, port)
+		group.clients[i] = newTestConnClient(t, i, network, port)
 	}
 
 	return group

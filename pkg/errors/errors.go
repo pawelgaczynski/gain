@@ -39,6 +39,8 @@ var (
 	ErrIsEmpty = errors.New("is empty")
 	// ErrConnectionAlreadyClosed when trying to close already closed connection.
 	ErrConnectionAlreadyClosed = errors.New("connection already closed")
+	// ErrConnectionAlreadyClosed when trying to work with closed connection.
+	ErrConnectionClosed = errors.New("connection closed")
 	// ErrConnectionIsMissing occurs when trying to access connection that is missing.
 	// For TCP connections key is the file descriptor.
 	ErrConnectionIsMissing = errors.New("connection is missing")
@@ -54,6 +56,8 @@ var (
 	ErrInvalidState = errors.New("invalid state")
 	// ErrAddressNotFound occurs when network address of fd could not be found.
 	ErrAddressNotFound = errors.New("address could not be found")
+	// ErrServerAlreadyRunning occurs when trying to start already running server.
+	ErrServerAlreadyRunning = errors.New("server already running")
 )
 
 func ErrorConnectionIsMissing(key int) error {

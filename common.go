@@ -35,3 +35,11 @@ func createClientAddr() (*syscall.RawSockaddrAny, *uint32) {
 
 //go:linkname anyToSockaddr syscall.anyToSockaddr
 func anyToSockaddr(rsa *syscall.RawSockaddrAny) (syscall.Sockaddr, error)
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+
+	return 0
+}

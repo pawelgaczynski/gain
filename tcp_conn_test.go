@@ -36,7 +36,7 @@ func testConnectionHandling(t *testing.T, architecture gain.ServerArchitecture) 
 	var connWaitGroup sync.WaitGroup
 
 	connWaitGroup.Add(10)
-	testHandler.onOpenCallback = func(_ gain.Conn) {
+	testHandler.onAcceptCallback = func(_ gain.Conn) {
 		connWaitGroup.Done()
 	}
 

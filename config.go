@@ -187,8 +187,8 @@ func NewConfig(opts ...ConfigOption) Config {
 		Workers:              runtime.NumCPU(),
 		CBPFilter:            false,
 		LoadBalancing:        RoundRobin,
-		SocketRecvBufferSize: defaultRecvBufferSize,
-		SocketSendBufferSize: defaultSendBufferSize,
+		SocketRecvBufferSize: 0,
+		SocketSendBufferSize: 0,
 		TCPKeepAlive:         0,
 	}
 	for _, opt := range opts {

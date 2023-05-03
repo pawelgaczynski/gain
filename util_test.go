@@ -30,13 +30,13 @@ func getTestPort() int {
 
 type onStartCallback func(server gain.Server)
 
-type onOpenCallback func(c gain.Conn)
+type onAcceptCallback func(c gain.Conn)
 
 type onReadCallback func(c gain.Conn)
 
 type onWriteCallback func(c gain.Conn)
 
-type onCloseCallback func(c gain.Conn)
+type onCloseCallback func(c gain.Conn, err error)
 
 func getFdFromConn(c net.Conn) int {
 	v := reflect.Indirect(reflect.ValueOf(c))
