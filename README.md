@@ -75,7 +75,7 @@ Gain requires Go 1.18+
 
 1. Install the framework
    ```sh
-   go get -u github.com/pawelgaczynski/gain@v0.1.0-alpha
+   go get -u github.com/pawelgaczynski/gain@v0.2.0-alpha
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
