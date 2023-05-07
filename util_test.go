@@ -32,9 +32,9 @@ type onStartCallback func(server gain.Server)
 
 type onAcceptCallback func(c gain.Conn)
 
-type onReadCallback func(c gain.Conn)
+type onReadCallback func(c gain.Conn, n int)
 
-type onWriteCallback func(c gain.Conn)
+type onWriteCallback func(c gain.Conn, n int)
 
 type onCloseCallback func(c gain.Conn, err error)
 

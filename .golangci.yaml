@@ -111,6 +111,7 @@ linters-settings:
     - syscall.Errno(
     - unix.Socket(
     - ErrIsEmpty
+    - .Wrapf(
 
     ignoreSigRegexps:
     - errors.Error.*\(

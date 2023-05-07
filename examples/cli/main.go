@@ -195,8 +195,8 @@ type EchoHandler struct {
 	gain.DefaultEventHandler
 }
 
-func (h EchoHandler) OnRead(c gain.Conn) {
-	buf, _ := c.Next(-1)
+func (h EchoHandler) OnRead(c gain.Conn, n int) {
+	buf, _ := c.Next(n)
 	_, _ = c.Write(buf)
 }
 
@@ -204,8 +204,8 @@ type HTTPHandler struct {
 	gain.DefaultEventHandler
 }
 
-func (h HTTPHandler) OnRead(conn gain.Conn) {
-	_, err := conn.Discard(conn.InboundBuffered())
+func (h HTTPHandler) OnRead(conn gain.Conn, n int) {
+	_, err := conn.Discard(n)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -262,7 +262,7 @@ func main() {
 	go func() {
 		<-c
 		fmt.Println("Server closing...")
-		server.Close()
+		server.Shutdown()
 	}()
 
 	if err := app.Run(os.Args); err != nil {

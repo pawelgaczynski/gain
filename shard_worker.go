@@ -124,11 +124,12 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 			break
 		}
 
-		conn.onKernelWrite(int(cqe.Res()))
+		n := int(cqe.Res())
+		conn.onKernelWrite(n)
 		w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
 
 		conn.setUserSpace()
-		w.eventHandler.OnWrite(conn)
+		w.eventHandler.OnWrite(conn, n)
 
 		if w.sendRecvMsg {
 			w.connectionManager.release(conn.key)
@@ -145,8 +146,13 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 		if cqe.UserData()&closeConnFlag > 0 {
 			w.closeConn(conn, false, nil)
 		} else if cqe.UserData()&writeDataFlag > 0 {
+			n := int(cqe.Res())
+			conn.onKernelWrite(n)
+			w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
 			conn.setUserSpace()
-			w.eventHandler.OnWrite(conn)
+			w.eventHandler.OnWrite(conn, n)
+			// conn.setUserSpace()
+			// w.eventHandler.OnWrite(conn)
 		}
 
 	default:

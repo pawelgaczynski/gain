@@ -172,7 +172,7 @@ func TestShardingReleasingUDPConns(t *testing.T) {
 	Equal(t, 0, server.ActiveConnections())
 	wg := testHandler.writeWG
 	wg.Wait()
-	server.Close()
+	server.Shutdown()
 }
 
 func TestShardingTCPCloseConnSync(t *testing.T) {

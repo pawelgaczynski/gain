@@ -43,8 +43,11 @@ type Server interface {
 	StartAsMainProcess(address string) error
 	// Start starts a server that will listen on the specified address.
 	Start(address string) error
-	// Close closes all connections and server.
-	Close()
+	// Shutdown closes all connections and shuts down server. It's blocking until the server shuts down.
+	Shutdown()
+	// AsyncShutdown closes all connections and shuts down server in asynchronous manner.
+	// It does not wait for the server shutdown to complete.
+	AsyncShutdown()
 	// ActiveConnections returns the number of active connections.
 	ActiveConnections() int
 	// IsRunning returns true if server is running and handling requests.
@@ -353,11 +356,18 @@ func (e *engine) Start(address string) error {
 	return e.start(false, address)
 }
 
-func (e *engine) Close() {
+func (e *engine) Shutdown() {
 	if state := e.state.Load(); state == running {
 		e.state.Store(closing)
 		e.closeChan <- user
 		<-e.closeBackChan
+	}
+}
+
+func (e *engine) AsyncShutdown() {
+	if state := e.state.Load(); state == running {
+		e.state.Store(closing)
+		e.closeChan <- user
 	}
 }
 

@@ -44,12 +44,12 @@ func (t *connServerTester) waitForWrites() {
 	t.writeWG.Wait()
 }
 
-func (t *connServerTester) onReadCallback(conn gain.Conn) {
-	buf, _ := conn.Next(-1)
+func (t *connServerTester) onReadCallback(conn gain.Conn, n int) {
+	buf, _ := conn.Next(n)
 	_, _ = conn.Write(buf)
 }
 
-func (t *connServerTester) onWriteCallback(_ gain.Conn) {
+func (t *connServerTester) onWriteCallback(_ gain.Conn, _ int) {
 	if t.writeWG != nil {
 		t.mutex.Lock()
 
@@ -290,8 +290,8 @@ func testConnAddress(
 
 	wg.Add(numberOfClients)
 
-	onReadCallback := func(conn gain.Conn) {
-		buf, _ := conn.Next(-1)
+	onReadCallback := func(conn gain.Conn, n int) {
+		buf, _ := conn.Next(n)
 		_, _ = conn.Write(buf)
 
 		verifyAddresses(t, conn)
@@ -324,5 +324,5 @@ func testConnAddress(
 	clientsGroup.Read(buffer)
 
 	wg.Wait()
-	server.Close()
+	server.Shutdown()
 }

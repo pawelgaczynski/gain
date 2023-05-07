@@ -110,14 +110,14 @@ func (w *readWriteWorkerImpl) handleAsyncWrites() {
 	}
 }
 
-func (w *readWriteWorkerImpl) work(conn *connection) {
+func (w *readWriteWorkerImpl) work(conn *connection, n int) {
 	conn.setUserSpace()
-	w.eventHandler.OnRead(conn)
+	w.eventHandler.OnRead(conn, n)
 }
 
-func (w *readWriteWorkerImpl) doAsyncWork(conn *connection) func() {
+func (w *readWriteWorkerImpl) doAsyncWork(conn *connection, n int) func() {
 	return func() {
-		w.work(conn)
+		w.work(conn, n)
 
 		switch {
 		case conn.OutboundBuffered() > 0:
@@ -167,7 +167,8 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 
 	w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes read")
 
-	conn.onKernelRead(int(cqe.Res()))
+	n := int(cqe.Res())
+	conn.onKernelRead(n)
 
 	if w.sendRecvMsg {
 		forkedConn := w.connectionManager.fork(conn, true)
@@ -187,12 +188,12 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 
 	if w.asyncHandler {
 		if w.goroutinePool {
-			w.pool.Submit(w.doAsyncWork(conn))
+			w.pool.Submit(w.doAsyncWork(conn, n))
 		} else {
-			go w.doAsyncWork(conn)()
+			go w.doAsyncWork(conn, n)()
 		}
 	} else {
-		w.work(conn)
+		w.work(conn, n)
 
 		switch {
 		case conn.OutboundBuffered() > 0:

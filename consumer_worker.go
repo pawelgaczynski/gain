@@ -91,11 +91,12 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 		}
 
 	case connWrite:
-		conn.onKernelWrite(int(cqe.Res()))
+		n := int(cqe.Res())
+		conn.onKernelWrite(n)
 		c.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
 
 		conn.setUserSpace()
-		c.eventHandler.OnWrite(conn)
+		c.eventHandler.OnWrite(conn, n)
 
 		err = c.addNextRequest(conn)
 		if err != nil {
@@ -106,8 +107,11 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 		if cqe.UserData()&closeConnFlag > 0 {
 			c.closeConn(conn, false, nil)
 		} else if cqe.UserData()&writeDataFlag > 0 {
+			n := int(cqe.Res())
+			conn.onKernelWrite(n)
+			c.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
 			conn.setUserSpace()
-			c.eventHandler.OnWrite(conn)
+			c.eventHandler.OnWrite(conn, n)
 		}
 
 	default:

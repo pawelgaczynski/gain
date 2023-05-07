@@ -30,7 +30,7 @@ func testConnectionHandling(t *testing.T, architecture gain.ServerArchitecture) 
 	server, port := newTestConnServer(t, gainNet.TCP, false, architecture, testHandler.testServerHandler)
 
 	defer func() {
-		server.Close()
+		server.Shutdown()
 	}()
 
 	var connWaitGroup sync.WaitGroup
