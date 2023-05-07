@@ -1,204 +1,301 @@
+// Copyright (c) 2023 Paweł Gaczyński
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package gain
 
 import (
 	"fmt"
-	"syscall"
+	"net"
+	"sync/atomic"
+	"time"
 
 	"github.com/pawelgaczynski/gain/iouring"
 	"github.com/pawelgaczynski/gain/logger"
-	"go.uber.org/multierr"
+	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
+	"github.com/pawelgaczynski/gain/pkg/socket"
 	"golang.org/x/sys/unix"
 )
 
 type shardWorkerConfig struct {
 	readWriteWorkerConfig
+	tcpKeepAlive time.Duration
 }
 
 type shardWorker struct {
 	*acceptor
 	*readWriteWorkerImpl
-	ring           *iouring.Ring
-	connectionPool *connectionPool
-	lockOSThread   bool
-	acceptStopped  bool
+	ring               *iouring.Ring
+	connectionManager  *connectionManager
+	cpuAffinity        bool
+	tcpKeepAlive       time.Duration
+	connectionProtocol bool
+	accepting          atomic.Bool
 }
 
-func (w *shardWorker) accept(cqe *iouring.CompletionQueueEvent) error {
-	if cqe.Res() < 0 {
-		return fmt.Errorf("accept request failed: %d for conn: %d", -cqe.Res(), cqe.UserData())
-	}
-	fileDescriptor := int(cqe.Res())
-	conn, err := w.connectionPool.get(fileDescriptor)
+func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
+	err := w.addAcceptConnRequest()
 	if err != nil {
-		return fmt.Errorf("fd: %d, getting connection error: %w", fileDescriptor, err)
+		w.accepting.Store(false)
+
+		return fmt.Errorf("add accept() request error: %w", err)
+	}
+
+	fileDescriptor := int(cqe.Res())
+	w.logDebug().Int("fd", fileDescriptor).Msg("Connection accepted")
+
+	conn := w.connectionManager.getFd(fileDescriptor)
+	if conn == nil {
+		return gainErrors.ErrorConnectionIsMissing(fileDescriptor)
 	}
 	conn.fd = fileDescriptor
-	if w.lockOSThread {
+	conn.localAddr = w.localAddr
+
+	var clientAddr net.Addr
+	if clientAddr, err = w.acceptor.lastClientAddr(); err == nil {
+		conn.remoteAddr = clientAddr
+	} else {
+		w.logError(err).Msg("get last client address failed")
+	}
+
+	if w.cpuAffinity {
 		err = unix.SetsockoptInt(fileDescriptor, unix.SOL_SOCKET, unix.SO_INCOMING_CPU, w.index()+1)
 		if err != nil {
 			return fmt.Errorf("fd: %d, setting SO_INCOMING_CPU error: %w", fileDescriptor, err)
 		}
 	}
-	_, err = w.addReadRequest(conn)
-	if err != nil {
-		return fmt.Errorf("add read request error: %w", err)
+
+	if w.tcpKeepAlive > 0 {
+		err = socket.SetKeepAlivePeriod(fileDescriptor, int(w.tcpKeepAlive.Seconds()))
+		if err != nil {
+			return fmt.Errorf("fd: %d, setting tcpKeepAlive error: %w", fileDescriptor, err)
+		}
 	}
-	w.eventHandler.OnOpen(conn.fd)
-	_, err = w.addAcceptConnRequest()
-	if err != nil {
-		w.acceptStopped = true
-		return fmt.Errorf("add accept() request error: %w", err)
-	}
-	return nil
+
+	conn.setUserSpace()
+	w.eventHandler.OnAccept(conn)
+
+	return w.addNextRequest(conn)
 }
 
 func (w *shardWorker) stopAccept() error {
-	return w.syscallShutdownSocket(w.socket)
+	return w.syscallCloseSocket(w.fd)
 }
 
 func (w *shardWorker) activeConnections() int {
-	return w.connectionPool.activeConnections(func(c *connection) bool {
-		return c.fd != w.socket
+	return w.connectionManager.activeConnections(func(c *connection) bool {
+		return c.fd != w.fd
 	})
 }
 
 func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueEvent) {
-	var err error
-	var errMsg string
+	var (
+		err    error
+		errMsg string
+	)
+
 	switch conn.state {
 	case connAccept:
-		err = w.accept(cqe)
+		err = w.onAccept(cqe)
 		if err != nil {
 			errMsg = "accept error"
 		}
+
 	case connRead:
-		err = w.read(cqe, conn.fd)
+		err = w.onRead(cqe, conn)
 		if err != nil {
 			errMsg = "read error"
 		}
+
 	case connWrite:
-		w.eventHandler.AfterWrite(conn)
-		err = w.write(cqe, conn)
-		if err != nil {
-			errMsg = "write error"
+		if !w.connectionProtocol && conn.key == 1 {
+			errMsg = "main socket cannot be in write mode"
+
+			break
 		}
+
+		n := int(cqe.Res())
+		conn.onKernelWrite(n)
+		w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+
+		conn.setUserSpace()
+		w.eventHandler.OnWrite(conn, n)
+
+		if w.sendRecvMsg {
+			w.connectionManager.release(conn.key)
+
+			break
+		}
+
+		err = w.addNextRequest(conn)
+		if err != nil {
+			errMsg = "add request error"
+		}
+
 	case connClose:
 		if cqe.UserData()&closeConnFlag > 0 {
-			err := w.connectionPool.release(conn.fd)
-			if err != nil {
-				errMsg = "close error"
-			}
+			w.closeConn(conn, false, nil)
+		} else if cqe.UserData()&writeDataFlag > 0 {
+			n := int(cqe.Res())
+			conn.onKernelWrite(n)
+			w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+			conn.setUserSpace()
+			w.eventHandler.OnWrite(conn, n)
+			// conn.setUserSpace()
+			// w.eventHandler.OnWrite(conn)
 		}
+
 	default:
-		err = fmt.Errorf("unknown connection state")
+		err = gainErrors.ErrorUnknownConnectionState(int(conn.state))
 	}
+
 	if err != nil {
-		shutdownErr := w.syscallShutdownSocket(conn.fd)
-		if shutdownErr != nil {
-			err = multierr.Combine(err, shutdownErr)
-		}
 		w.logError(err).Msg(errMsg)
+
+		w.closeConn(conn, true, err)
 	}
 }
 
-func (w *shardWorker) loop(socket int) error {
-	w.logInfo().Int("socket", socket).Msg("Starting worker loop...")
-	w.socket = socket
-	w.prepareHandler = func() error {
-		w.startedChan <- done
-		_, err := w.addAcceptConnRequest()
-		if err != nil {
-			w.acceptStopped = true
+func (w *shardWorker) initLoop() {
+	if w.connectionProtocol {
+		w.prepareHandler = func() error {
+			w.startedChan <- done
+
+			err := w.addAcceptConnRequest()
+			if err == nil {
+				w.accepting.Store(true)
+			}
+
+			return err
 		}
-		return err
+	} else {
+		w.prepareHandler = func() error {
+			w.startedChan <- done
+			// 1 is always index for main socket
+			conn := w.connectionManager.get(1, w.fd)
+			if conn == nil {
+				return gainErrors.ErrorConnectionIsMissing(1)
+			}
+			conn.fd = w.fd
+			conn.initMsgHeader()
+
+			return w.addReadRequest(conn)
+		}
 	}
 	w.shutdownHandler = func() bool {
 		if w.needToShutdown() {
 			w.onCloseHandler()
 			w.markShutdownInProgress()
 		}
+
 		return true
 	}
 	w.loopFinisher = w.handleAsyncWritesIfEnabled
 	w.loopFinishCondition = func() bool {
-		if w.connectionPool.allClosed() || (w.acceptStopped && w.activeConnections() == 0) {
+		if w.connectionManager.allClosed() || (w.connectionProtocol && !w.accepting.Load() && w.activeConnections() == 0) {
 			w.notifyFinish()
+
 			return true
 		}
+
 		return false
 	}
+}
+
+func (w *shardWorker) loop(fd int) error {
+	w.logInfo().Int("fd", fd).Msg("Starting worker loop...")
+	w.fd = fd
+	w.initLoop()
 
 	loopErr := w.startLoop(w.index(), func(cqe *iouring.CompletionQueueEvent) error {
 		var err error
-		if exit := w.processEvent(cqe); exit {
-			return nil
-		}
-		fileDescriptor := int(cqe.UserData() & ^allFlagsMask)
-		if fileDescriptor < syscall.Stderr {
-			w.logError(nil).Int("fd", fileDescriptor).Msg("Invalid file descriptor")
-			return nil
-		}
-		conn, err := w.connectionPool.get(fileDescriptor)
-		if err != nil {
-			shutdownErr := w.syscallShutdownSocket(fileDescriptor)
-			if shutdownErr != nil {
-				err = multierr.Combine(err, shutdownErr)
+		if exit := w.processEvent(cqe, func(cqe *iouring.CompletionQueueEvent) bool {
+			keyOrFd := cqe.UserData() & ^allFlagsMask
+			if acceptReqFailedAfterStop := keyOrFd == uint64(w.fd) &&
+				!w.accepting.Load(); acceptReqFailedAfterStop {
+				return true
 			}
-			w.logError(err).Int("fd", fileDescriptor).Msg("Get connection error")
+
+			return false
+		}); exit {
+			return nil
+		}
+		key := int(cqe.UserData() & ^allFlagsMask)
+		var connFd int
+		if w.connectionProtocol {
+			connFd = key
+		} else {
+			connFd = w.fd
+		}
+		conn := w.connectionManager.get(key, connFd)
+		if conn == nil {
+			if w.connectionProtocol {
+				_ = w.syscallCloseSocket(connFd)
+			}
+			logEvent := w.logError(err)
+			if w.connectionProtocol {
+				logEvent = logEvent.Int("conn fd", connFd)
+			}
+
+			logEvent.Msg("Get connection error")
+
 			return nil
 		}
 		w.handleConn(conn, cqe)
+
 		return nil
 	})
-	err := w.stopAccept()
-	if err != nil {
-		w.logError(err).Msg("Socket shutdown error")
-	}
+	_ = w.stopAccept()
+
 	return loopErr
 }
 
-func (w *shardWorker) closeConnsAndRings() {
+func (w *shardWorker) closeAllConnsAndRings() {
 	w.logWarn().Msg("Closing connections")
-	err := w.syscallShutdownSocket(w.socket)
-	if err != nil {
-		w.logError(err).Int("socket", w.socket).Msg("Socket shutdown error")
-	}
-	err = w.connectionPool.close(func(conn *connection) error {
-		_, err := w.addCloseConnRequest(conn)
+	w.accepting.Store(false)
+	_ = w.syscallCloseSocket(w.fd)
+	w.connectionManager.close(func(conn *connection) bool {
+		err := w.addCloseConnRequest(conn)
 		if err != nil {
 			w.logError(err).Msg("Add close() connection request error")
 		}
-		return err
-	}, w.socket)
-	if err != nil {
-		w.logError(err).Msg("Closing connections error")
-	}
+
+		return err == nil
+	}, w.fd)
 }
 
-func newShardWorker(index int, config shardWorkerConfig, eventHandler EventHandler) (*shardWorker, error) {
+func newShardWorker(
+	index int, localAddr net.Addr, config shardWorkerConfig, eventHandler EventHandler,
+) (*shardWorker, error) {
 	ring, err := iouring.CreateRing()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating ring error: %w", err)
 	}
 	logger := logger.NewLogger("worker", config.loggerLevel, config.prettyLogger)
-	connectionPool := newConnectionPool(
-		config.maxConn,
-		config.bufferSize,
-		config.prefillConnectionPool,
-	)
-	readWriteWorkerImpl, err := newReadWriteWorkerImpl(
-		ring, index, eventHandler, connectionPool, config.readWriteWorkerConfig, logger,
-	)
-	if err != nil {
-		return nil, err
-	}
+	connectionManager := newConnectionManager()
+	connectionProtocol := !config.sendRecvMsg
 	worker := &shardWorker{
-		acceptor:            newAcceptor(ring, connectionPool),
-		readWriteWorkerImpl: readWriteWorkerImpl,
-		ring:                ring,
-		connectionPool:      connectionPool,
-		lockOSThread:        config.lockOSThread,
+		readWriteWorkerImpl: newReadWriteWorkerImpl(
+			ring, index, localAddr, eventHandler, connectionManager, config.readWriteWorkerConfig, logger,
+		),
+		ring:               ring,
+		connectionManager:  connectionManager,
+		cpuAffinity:        config.cpuAffinity,
+		tcpKeepAlive:       config.tcpKeepAlive,
+		connectionProtocol: connectionProtocol,
+		acceptor:           newAcceptor(ring, connectionManager),
 	}
-	worker.onCloseHandler = worker.closeConnsAndRings
+	worker.onCloseHandler = worker.closeAllConnsAndRings
+
 	return worker, nil
 }
