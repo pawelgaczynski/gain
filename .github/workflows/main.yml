@@ -8,34 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      - uses: kenchan0130/actions-system-info@master
-        id: system-info
-      
-      - name: Check outputs
-        run: |
-          OUTPUTS=(
-            "CPU Core: ${{ steps.system-info.outputs.cpu-core }}"
-            "CPU Model: ${{ steps.system-info.outputs.cpu-model }}"
-            "Hostname: ${{ steps.system-info.outputs.hostname }}"
-            "Kernel release: ${{ steps.system-info.outputs.kernel-release }}"
-            "Kernel version: ${{ steps.system-info.outputs.kernel-version }}"
-            "Name: ${{ steps.system-info.outputs.name }}"
-            "Platform: ${{ steps.system-info.outputs.platform }}"
-            "Release: ${{ steps.system-info.outputs.release }}"
-            "Total memory bytes: ${{ steps.system-info.outputs.totalmem }}"
-          )
-          IS_EMPTY_OUTOUT=false
-          for OUTPUT in "${OUTPUTS[@]}";do
-            echo "${OUTPUT}"
-            OUT=$(echo ${OUTPUT} | cut -d ':' -f2- | xargs)
-            if [[ -z "${OUT}" ]];then
-              IS_EMPTY_OUTOUT=true
-            fi
-          done
-          if "$IS_EMPTY_OUTOUT";then
-            exit 1
-          fi
+
+      - name: Tune GitHub-hosted runner network
+        uses: smorimoto/tune-github-hosted-runner-network@v1
 
       - name: Set up Go
         uses: actions/setup-go@v4
