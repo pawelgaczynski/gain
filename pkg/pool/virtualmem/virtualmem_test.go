@@ -124,6 +124,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	fdCmd := fmt.Sprintf("ls -l /proc/%d/fd | wc -l", pid)
 
 	printCmd("ulimit -a")
+	printCmd("sysctl vm.max_map_count")
 
 	printList := func() {
 		printCmd(listCmd)
