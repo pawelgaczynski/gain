@@ -105,14 +105,14 @@ func BenchmarkVMMemfd(b *testing.B) {
 
 var printMapsAndFds = os.Getenv("TEST_PRINT_MAPS_AND_FDS") == "true"
 
-var printCmd = func(cmd string) {
+var printCmd = func(label, cmd string) {
 	out, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
 		log.Panic(err)
 	}
 
 	if printMapsAndFds {
-		fmt.Println(string(out)) //nolint:forbidigo
+		fmt.Printf("%s: %s\n", label, string(out)) //nolint:forbidigo
 	}
 }
 
@@ -123,17 +123,17 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	countCmd := fmt.Sprintf("cat /proc/%d/maps | wc -l", pid)
 	fdCmd := fmt.Sprintf("ls -l /proc/%d/fd | wc -l", pid)
 
-	printCmd("ulimit -a")
-	printCmd("sysctl vm.max_map_count")
+	printCmd("ulimit -a", "ulimit -a")
+	printCmd("max map count", "sysctl vm.max_map_count")
 
 	printList := func() {
-		printCmd(listCmd)
+		printCmd("list of proc maps", listCmd)
 	}
 	printCount := func() {
-		printCmd(countCmd)
+		printCmd("count of proc maps", countCmd)
 	}
 	printFds := func() {
-		printCmd(fdCmd)
+		printCmd("count of proc fds", fdCmd)
 	}
 
 	var (
@@ -152,6 +152,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 100; i++ {
 		data = allocateBuffer(pagesize)
@@ -161,6 +162,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 1000; i++ {
 		data = allocateBuffer(pagesize)
@@ -170,6 +172,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -179,6 +182,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -188,6 +192,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -197,6 +202,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -206,6 +212,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -215,6 +222,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -224,6 +232,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -233,6 +242,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -242,6 +252,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 10000; i++ {
 		data = allocateBuffer(pagesize)
@@ -251,6 +262,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 30000; i++ {
 		data = allocateBuffer(pagesize)
@@ -260,6 +272,7 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
+	printFds()
 
 	for i := 0; i < 60000; i++ {
 		data = allocateBuffer(pagesize)
@@ -269,6 +282,6 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	}
 
 	printCount()
-
+	printFds()
 	printList()
 }
