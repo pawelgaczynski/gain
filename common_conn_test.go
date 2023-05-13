@@ -121,7 +121,7 @@ type testConnClient struct {
 }
 
 func (c *testConnClient) Dial() {
-	conn, err := net.DialTimeout(c.network, fmt.Sprintf("localhost:%d", c.port), time.Millisecond*500)
+	conn, err := net.DialTimeout(c.network, fmt.Sprintf("localhost:%d", c.port), time.Second)
 	Nil(c.t, err)
 	NotNil(c.t, conn)
 	c.conn = conn

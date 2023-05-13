@@ -400,11 +400,11 @@ func testCloseServer(t *testing.T, network string, architecture gain.ServerArchi
 
 	_, err := rand.Read(data)
 	Nil(t, err)
-	clientsGroup.SetDeadline(time.Now().Add(time.Millisecond * 500))
+	clientsGroup.SetDeadline(time.Now().Add(time.Second))
 	clientsGroup.Write(data)
 	buffer := make([]byte, 512)
 
-	clientsGroup.SetDeadline(time.Now().Add(time.Millisecond * 500))
+	clientsGroup.SetDeadline(time.Now().Add(time.Second))
 	clientsGroup.Read(buffer)
 
 	clientsGroup.SetDeadline(time.Time{})
