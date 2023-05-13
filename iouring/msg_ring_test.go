@@ -15,6 +15,8 @@
 package iouring_test
 
 import (
+	"fmt"
+	"syscall"
 	"testing"
 
 	"github.com/pawelgaczynski/gain/iouring"
@@ -45,6 +47,18 @@ func TestMsgRingItself(t *testing.T) {
 	numberOfCQEsSubmitted, err := ring.Submit()
 	Nil(t, err)
 	Equal(t, uint(3), numberOfCQEsSubmitted)
+
+	if numberOfCQEsSubmitted == 1 {
+		cqe, cqeErr := ring.WaitCQE()
+		Nil(t, cqeErr)
+
+		if cqe.Res() == -int32(syscall.EINVAL) || cqe.Res() == -int32(syscall.EOPNOTSUPP) {
+			//nolint
+			fmt.Println("Skipping test because of no msg support")
+
+			return
+		}
+	}
 
 	cqes := make([]*iouring.CompletionQueueEvent, 128)
 
@@ -109,6 +123,18 @@ func TestMsgRing(t *testing.T) {
 
 	numberOfCQEs := receiverRing.PeekBatchCQE(cqes)
 	Equal(t, 3, numberOfCQEs)
+
+	if cqeNr == 1 {
+		cqe, cqeErr := senderRing.WaitCQE()
+		Nil(t, cqeErr)
+
+		if cqe.Res() == -int32(syscall.EINVAL) || cqe.Res() == -int32(syscall.EOPNOTSUPP) {
+			//nolint
+			fmt.Println("Skipping test because of no msg support")
+
+			return
+		}
+	}
 
 	cqe := cqes[0]
 	Equal(t, uint64(200), cqe.UserData())

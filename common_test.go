@@ -497,6 +497,13 @@ func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitectur
 func testLargeRead(t *testing.T, network string, architecture gain.ServerArchitecture) {
 	t.Helper()
 
+	if !checkKernelCompatibility(5, 19) {
+		//nolint
+		fmt.Println("Not supported by kernel")
+
+		return
+	}
+
 	doublePageSize := os.Getpagesize() * 4
 	data := make([]byte, doublePageSize)
 	_, err := rand.Read(data)
