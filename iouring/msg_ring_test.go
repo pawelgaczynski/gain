@@ -46,7 +46,6 @@ func TestMsgRingItself(t *testing.T) {
 
 	numberOfCQEsSubmitted, err := ring.Submit()
 	Nil(t, err)
-	Equal(t, uint(3), numberOfCQEsSubmitted)
 
 	if numberOfCQEsSubmitted == 1 {
 		cqe, cqeErr := ring.WaitCQE()
@@ -59,6 +58,8 @@ func TestMsgRingItself(t *testing.T) {
 			return
 		}
 	}
+
+	Equal(t, uint(3), numberOfCQEsSubmitted)
 
 	cqes := make([]*iouring.CompletionQueueEvent, 128)
 
@@ -117,12 +118,6 @@ func TestMsgRing(t *testing.T) {
 
 	cqeNr, err := senderRing.Submit()
 	Nil(t, err)
-	Equal(t, uint(3), cqeNr)
-
-	cqes := make([]*iouring.CompletionQueueEvent, 128)
-
-	numberOfCQEs := receiverRing.PeekBatchCQE(cqes)
-	Equal(t, 3, numberOfCQEs)
 
 	if cqeNr == 1 {
 		cqe, cqeErr := senderRing.WaitCQE()
@@ -135,6 +130,13 @@ func TestMsgRing(t *testing.T) {
 			return
 		}
 	}
+
+	Equal(t, uint(3), cqeNr)
+
+	cqes := make([]*iouring.CompletionQueueEvent, 128)
+
+	numberOfCQEs := receiverRing.PeekBatchCQE(cqes)
+	Equal(t, 3, numberOfCQEs)
 
 	cqe := cqes[0]
 	Equal(t, uint64(200), cqe.UserData())
