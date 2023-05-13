@@ -123,6 +123,8 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	countCmd := fmt.Sprintf("cat /proc/%d/maps | wc -l", pid)
 	fdCmd := fmt.Sprintf("ls -l /proc/%d/fd | wc -l", pid)
 
+	printCmd("ulimit -a")
+
 	printList := func() {
 		printCmd(listCmd)
 	}
