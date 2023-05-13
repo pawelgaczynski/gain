@@ -103,7 +103,7 @@ func BenchmarkVMMemfd(b *testing.B) {
 	}
 }
 
-const printMapsAndFds = false
+var printMapsAndFds = os.Getenv("TEST_PRINT_MAPS_AND_FDS") == "true"
 
 var printCmd = func(cmd string) {
 	out, err := exec.Command("bash", "-c", cmd).Output()
