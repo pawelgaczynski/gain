@@ -1,12 +1,14 @@
 <a name="readme-top"></a>
 
-[![Apache 2.0 License][license-shield]][license-url]
-
 <br />
 <div align="center">
   <a href="https://github.com/pawelgaczynski/gain">
     <img src="images/gain.png" alt="Logo" width="495" height="327">
   </a>
+
+  [![Apache 2.0 License][license-shield]][license-url]
+  [![Go Reference](https://pkg.go.dev/badge/github.com/pawelgaczynski/gain.svg)](https://pkg.go.dev/github.com/pawelgaczynski/gain)
+  [![Go Report Card](https://goreportcard.com/badge/github.com/pawelgaczynski/gain)](https://goreportcard.com/report/github.com/pawelgaczynski/gain)
 
   <h2 align="center">Gain</h2>
 
@@ -67,7 +69,7 @@ Articles about the project:
 
 ### Prerequisites
 
-Gain requires Go 1.18+
+Gain requires Go 1.19+
 
 <br/>
 
@@ -75,7 +77,7 @@ Gain requires Go 1.18+
 
 1. Install the framework
    ```sh
-   go get -u github.com/pawelgaczynski/gain@v0.2.0-alpha
+   go get -u github.com/pawelgaczynski/gain@v0.3.0-alpha
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
