@@ -57,6 +57,7 @@ Gain is a high-performance networking framework written entirely in Go. It uses 
 Articles about the project:
 
 * [Medium - Meet Gain - the New Fastest Go TCP Framework](https://medium.com/better-programming/gain-the-new-fastest-go-tcp-framework-40ec111d40e6)
+* [Medium - Writing High-performance TCP Applications Using the Gain Web Framework](https://medium.com/better-programming/an-introduction-to-gain-part-1-writing-high-performance-tcp-application-df5f7253e54a)
 
 <br/>
 
