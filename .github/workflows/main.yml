@@ -1,6 +1,20 @@
 name: Gain package
 
-on: [pull_request]
+on:
+  push:
+    branches:
+      - master
+      - dev
+      - 1.x
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - master
+      - dev
+      - 1.x
+    paths-ignore:
+      - '**.md'
 
 # env:
   # TEST_PRINT_MAPS_AND_FDS: true
