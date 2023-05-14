@@ -34,6 +34,7 @@ func (r *reader) addReadRequest(conn *connection) error {
 	conn.inboundBuffer.GrowIfUnsufficientFreeSpace()
 
 	if r.recvMsg {
+		fmt.Println("Read -> recvMsg, buffer size: ", conn.msgHdr.Iov.Len)
 		entry.PrepareRecvMsg(conn.fd, conn.msgHdr, 0)
 		entry.UserData = readDataFlag | uint64(conn.key)
 	} else {

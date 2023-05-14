@@ -218,6 +218,7 @@ func (w *shardWorker) loop(fd int) error {
 	w.initLoop()
 
 	loopErr := w.startLoop(w.index(), func(cqe *iouring.CompletionQueueEvent) error {
+		fmt.Printf("%+v\n", cqe)
 		var err error
 		if exit := w.processEvent(cqe, func(cqe *iouring.CompletionQueueEvent) bool {
 			keyOrFd := cqe.UserData() & ^allFlagsMask
