@@ -151,8 +151,6 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 			w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
 			conn.setUserSpace()
 			w.eventHandler.OnWrite(conn, n)
-			// conn.setUserSpace()
-			// w.eventHandler.OnWrite(conn)
 		}
 
 	default:
@@ -218,7 +216,6 @@ func (w *shardWorker) loop(fd int) error {
 	w.initLoop()
 
 	loopErr := w.startLoop(w.index(), func(cqe *iouring.CompletionQueueEvent) error {
-		fmt.Printf("%+v\n", cqe)
 		var err error
 		if exit := w.processEvent(cqe, func(cqe *iouring.CompletionQueueEvent) bool {
 			keyOrFd := cqe.UserData() & ^allFlagsMask

@@ -54,8 +54,6 @@ func testHandlerMethod(
 
 	server, port := newTestConnServer(t, network, asyncHandler, architecture, eventHandlerTester)
 
-	fmt.Println("testHandlerMethod -> connecting to: ", fmt.Sprintf("%s://127.0.0.1:%d", network, port))
-
 	conn, err := net.DialTimeout(network, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 	if err != nil && !errors.Is(err, syscall.ECONNRESET) {
 		conn, err = net.DialTimeout(network, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
@@ -63,31 +61,24 @@ func testHandlerMethod(
 			log.Panic(err)
 		}
 	}
-	fmt.Println("testHandlerMethod -> client connected!")
 
 	clientBehavior(conn)
 
 	if callCounts[0] > 0 {
-		fmt.Println("WAIT ON ACCEPT")
 		eventHandlerTester.onAcceptWg.Wait()
 	}
 
 	if callCounts[1] > 0 {
-		fmt.Println("WAIT ON READ")
 		eventHandlerTester.onReadWg.Wait()
 	}
 
 	if callCounts[2] > 0 {
-		fmt.Println("WAIT ON WRITE")
 		eventHandlerTester.onWriteWg.Wait()
 	}
 
 	if callCounts[3] > 0 {
-		fmt.Println("WAIT ON CLOSE")
 		eventHandlerTester.onCloseWg.Wait()
 	}
-
-	fmt.Println("AFTER WAITING!!!")
 
 	eventHandlerTester.finished.Store(true)
 
@@ -187,53 +178,12 @@ func createTestCases(
 	return testCases
 }
 
-func TestAUDP(t *testing.T) {
-	port := getTestPort()
-	address := fmt.Sprintf("127.0.0.1:%d", port)
-
-	udpServer, err := net.ListenPacket("udp", address)
-	Nil(t, err)
-
-	defer udpServer.Close()
-
-	go func() {
-		for {
-			buf := make([]byte, 4096)
-			_, addr, rErr := udpServer.ReadFrom(buf)
-			if rErr != nil {
-				continue
-			}
-			udpServer.WriteTo(buf, addr)
-		}
-	}()
-
-	udpServerAddress, err := net.ResolveUDPAddr("udp", address)
-	Nil(t, err)
-
-	conn, err := net.DialUDP("udp", nil, udpServerAddress)
-	Nil(t, err)
-
-	//close the connection
-	defer conn.Close()
-
-	_, err = conn.Write([]byte("This is a UDP message"))
-	Nil(t, err)
-	// buffer to get data
-	received := make([]byte, 1024)
-	_, err = conn.Read(received)
-	Nil(t, err)
-
-	println(string(received))
-}
-
 func TestEventHandlerOnRead(t *testing.T) {
 	callbacks := callbacksHolder{
 		onReadCallback: func(conn gain.Conn, n int) {
-			fmt.Println("TestEventHandlerOnRead -> onReadCallback...")
 			buffer, err := conn.Next(n)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
-			fmt.Println("TestEventHandlerOnRead -> onReadCallback... END")
 		},
 	}
 	clientBehavior := func(conn net.Conn) {
@@ -241,13 +191,12 @@ func TestEventHandlerOnRead(t *testing.T) {
 		if err != nil {
 			log.Panic(err)
 		}
-		fmt.Println("TestEventHandlerOnRead -> client connected. Try to write...")
+
 		n, err := conn.Write(eventHandlerTestData)
-		fmt.Println("TestEventHandlerOnRead -> client connected. Bytes written: ", n)
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
-		fmt.Println("TestEventHandlerOnRead -> read")
 		buffer := make([]byte, 1024)
+
 		err = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 500))
 		if err != nil {
 			log.Panic(err)
@@ -255,7 +204,6 @@ func TestEventHandlerOnRead(t *testing.T) {
 		n, err = conn.Read(buffer)
 		Equal(t, n, 0)
 		NotNil(t, err)
-		fmt.Println("END OF CLIENT BEHAVIOUR")
 		conn.Close()
 	}
 
@@ -422,6 +370,7 @@ func TestEventHandlerOnAccept(t *testing.T) {
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
 		Equal(t, eventHandlerTestData, buffer[:eventHandlerTestDataSize])
+		conn.Close()
 	}
 
 	testCases = createTestCases("Write", tcp, callbacks, clientBehavior, [][]int{
@@ -500,6 +449,8 @@ func TestEventHandlerOnWrite(t *testing.T) {
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer[:eventHandlerTestDataSize])
 		}
+
+		conn.Close()
 	}
 
 	testCases := createTestCases("AdditionalWrite", tcp, callbacks, clientBehavior, [][]int{

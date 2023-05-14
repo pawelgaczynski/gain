@@ -143,10 +143,6 @@ func udpSocket(proto, addr string, connect bool, sockOpts ...Option) (int, net.A
 	if connect {
 		err = os.NewSyscallError("connect", unix.Connect(fd, sockAddr))
 	} else {
-		if inet4Addr, ok := sockAddr.(*unix.SockaddrInet4); ok {
-			fmt.Printf("UDP BIND -> %+v\n", inet4Addr)
-		}
-
 		err = os.NewSyscallError("bind", unix.Bind(fd, sockAddr))
 	}
 

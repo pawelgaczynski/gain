@@ -15,16 +15,11 @@
 package iouring_test
 
 import (
-	"fmt"
 	"sync/atomic"
 )
 
 var port int32 = 8000
 
 func getTestPort() int {
-	res := int(atomic.AddInt32(&port, 1))
-
-	fmt.Println("Getting test port (iouring): ", res)
-
-	return res
+	return int(atomic.AddInt32(&port, 1))
 }
