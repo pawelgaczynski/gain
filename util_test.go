@@ -16,6 +16,7 @@ package gain_test
 
 import (
 	"net"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -23,7 +24,23 @@ import (
 	"syscall"
 
 	"github.com/pawelgaczynski/gain"
+	"github.com/rs/zerolog"
 )
+
+var testLoggerLevel = os.Getenv("TEST_LOGGER_LEVEL")
+
+func getTestLoggerLevel() zerolog.Level {
+	if testLoggerLevel == "" {
+		return zerolog.FatalLevel
+	}
+
+	loggerLevel, err := zerolog.ParseLevel(testLoggerLevel)
+	if err != nil {
+		return zerolog.FatalLevel
+	}
+
+	return loggerLevel
+}
 
 func int8ToStr(arr []int8) string {
 	buffer := make([]byte, 0, len(arr))

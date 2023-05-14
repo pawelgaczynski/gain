@@ -30,7 +30,6 @@ import (
 	"github.com/pawelgaczynski/gain"
 	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
-	"github.com/rs/zerolog"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -233,7 +232,7 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 		log.Panic("network protocol is missing")
 	}
 	opts := []gain.ConfigOption{
-		gain.WithLoggerLevel(zerolog.FatalLevel),
+		gain.WithLoggerLevel(getTestLoggerLevel()),
 		gain.WithAsyncHandler(testConfig.asyncHandler),
 		gain.WithGoroutinePool(testConfig.goroutinePool),
 		gain.WithCPUAffinity(testConfig.cpuAffinity),

@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/pawelgaczynski/gain"
-	"github.com/rs/zerolog"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -212,7 +211,7 @@ func newTestConnServer(
 ) (gain.Server, int) {
 	t.Helper()
 	opts := []gain.ConfigOption{
-		gain.WithLoggerLevel(zerolog.FatalLevel),
+		gain.WithLoggerLevel(getTestLoggerLevel()),
 		gain.WithWorkers(4),
 		gain.WithArchitecture(architecture),
 		gain.WithAsyncHandler(async),
@@ -252,7 +251,7 @@ func testConnAddress(
 	t.Helper()
 	numberOfClients := 10
 	opts := []gain.ConfigOption{
-		gain.WithLoggerLevel(zerolog.FatalLevel),
+		gain.WithLoggerLevel(getTestLoggerLevel()),
 		gain.WithWorkers(4),
 		gain.WithArchitecture(architecture),
 	}
