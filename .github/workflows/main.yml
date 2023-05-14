@@ -4,6 +4,7 @@ on: [pull_request]
 
 env:
   TEST_PRINT_MAPS_AND_FDS: true
+  TEST_LOGGER_LEVEL: error
 
 jobs:
   build:
