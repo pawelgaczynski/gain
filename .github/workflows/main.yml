@@ -2,9 +2,9 @@ name: Gain package
 
 on: [pull_request]
 
-env:
-  TEST_PRINT_MAPS_AND_FDS: true
-  TEST_LOGGER_LEVEL: trace
+# env:
+  # TEST_PRINT_MAPS_AND_FDS: true
+  # TEST_LOGGER_LEVEL: trace
 
 jobs:
   build:
@@ -25,7 +25,7 @@ jobs:
         run: go get .
 
       - name: Run coverage
-        run: go test -v ./... -timeout 10s -coverprofile=coverage.out -covermode=atomic
+        run: go test -v ./... -timeout 30s -coverprofile=coverage.out -covermode=atomic
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
