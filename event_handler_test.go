@@ -54,7 +54,7 @@ func testHandlerMethod(
 
 	server, port := newTestConnServer(t, network, asyncHandler, architecture, eventHandlerTester)
 
-	fmt.Println("testHandlerMethod -> connecting to: ", fmt.Sprintf("localhost:%d", port))
+	fmt.Println("testHandlerMethod -> connecting to: ", fmt.Sprintf("%s://localhost:%d", network, port))
 
 	conn, err := net.DialTimeout(network, fmt.Sprintf("localhost:%d", port), time.Second)
 	if err != nil && !errors.Is(err, syscall.ECONNRESET) {
@@ -68,20 +68,26 @@ func testHandlerMethod(
 	clientBehavior(conn)
 
 	if callCounts[0] > 0 {
+		fmt.Println("WAIT ON ACCEPT")
 		eventHandlerTester.onAcceptWg.Wait()
 	}
 
 	if callCounts[1] > 0 {
+		fmt.Println("WAIT ON READ")
 		eventHandlerTester.onReadWg.Wait()
 	}
 
 	if callCounts[2] > 0 {
+		fmt.Println("WAIT ON WRITE")
 		eventHandlerTester.onWriteWg.Wait()
 	}
 
 	if callCounts[3] > 0 {
+		fmt.Println("WAIT ON CLOSE")
 		eventHandlerTester.onCloseWg.Wait()
 	}
+
+	fmt.Println("AFTER WAITING!!!")
 
 	eventHandlerTester.finished.Store(true)
 
@@ -227,14 +233,30 @@ func TestEventHandlerOnRead(t *testing.T) {
 			buffer, err := conn.Next(n)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
+			fmt.Println("TestEventHandlerOnRead -> onReadCallback... END")
 		},
 	}
 	clientBehavior := func(conn net.Conn) {
+		err := conn.SetWriteDeadline(time.Now().Add(time.Millisecond * 500))
+		if err != nil {
+			log.Panic(err)
+		}
 		fmt.Println("TestEventHandlerOnRead -> client connected. Try to write...")
 		n, err := conn.Write(eventHandlerTestData)
 		fmt.Println("TestEventHandlerOnRead -> client connected. Bytes written: ", n)
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
+		fmt.Println("TestEventHandlerOnRead -> read")
+		buffer := make([]byte, 1024)
+		err = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 500))
+		if err != nil {
+			log.Panic(err)
+		}
+		n, err = conn.Read(buffer)
+		Equal(t, n, 0)
+		NotNil(t, err)
+		fmt.Println("END OF CLIENT BEHAVIOUR")
+		conn.Close()
 	}
 
 	testCases := createTestCases("JustRead", both, callbacks, clientBehavior, [][]int{
@@ -272,6 +294,7 @@ func TestEventHandlerOnRead(t *testing.T) {
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
 		Equal(t, eventHandlerTestData, buffer[:eventHandlerTestDataSize])
+		conn.Close()
 	}
 
 	testCases = createTestCases("ReadAndWrite", both, callbacks, clientBehavior, [][]int{
