@@ -96,6 +96,8 @@ func allocateBuffer(size int) []byte {
 		log.Panic(fmt.Errorf("second internal mmap failed: %w", err))
 	}
 
+	syscall.Close(fileDescriptor)
+
 	sliceHeader := reflect.SliceHeader{
 		Data: vaddr,
 		Len:  doubleSize(size),

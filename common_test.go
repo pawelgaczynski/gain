@@ -30,7 +30,6 @@ import (
 	"github.com/pawelgaczynski/gain"
 	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
-	"github.com/rs/zerolog"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -192,7 +191,7 @@ var deafultAfterDial = func(t *testing.T, conn net.Conn, repeats, clientIndex in
 
 func dialClient(t *testing.T, protocol string, port int, clientConnChan chan net.Conn) {
 	t.Helper()
-	conn, err := net.DialTimeout(protocol, fmt.Sprintf("localhost:%d", port), time.Second)
+	conn, err := net.DialTimeout(protocol, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 	Nil(t, err)
 	NotNil(t, conn)
 	clientConnChan <- conn
@@ -202,7 +201,7 @@ func dialClientRW(t *testing.T, protocol string, port int,
 	afterDial afterDialCallback, repeats, clientIndex int, clientConnChan chan net.Conn,
 ) {
 	t.Helper()
-	conn, err := net.DialTimeout(protocol, fmt.Sprintf("localhost:%d", port), 2*time.Second)
+	conn, err := net.DialTimeout(protocol, fmt.Sprintf("127.0.0.1:%d", port), 2*time.Second)
 	Nil(t, err)
 	NotNil(t, conn)
 	afterDial(t, conn, repeats, clientIndex)
@@ -233,7 +232,7 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 		log.Panic("network protocol is missing")
 	}
 	opts := []gain.ConfigOption{
-		gain.WithLoggerLevel(zerolog.FatalLevel),
+		gain.WithLoggerLevel(getTestLoggerLevel()),
 		gain.WithAsyncHandler(testConfig.asyncHandler),
 		gain.WithGoroutinePool(testConfig.goroutinePool),
 		gain.WithCPUAffinity(testConfig.cpuAffinity),
@@ -254,7 +253,7 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 	testPort := getTestPort()
 
 	go func() {
-		err := server.Start(fmt.Sprintf("%s://localhost:%d", testConfig.protocol, testPort))
+		err := server.Start(fmt.Sprintf("%s://127.0.0.1:%d", testConfig.protocol, testPort))
 		if err != nil {
 			log.Panic(err)
 		}
@@ -400,11 +399,11 @@ func testCloseServer(t *testing.T, network string, architecture gain.ServerArchi
 
 	_, err := rand.Read(data)
 	Nil(t, err)
-	clientsGroup.SetDeadline(time.Now().Add(time.Millisecond * 500))
+	clientsGroup.SetDeadline(time.Now().Add(time.Second))
 	clientsGroup.Write(data)
 	buffer := make([]byte, 512)
 
-	clientsGroup.SetDeadline(time.Now().Add(time.Millisecond * 500))
+	clientsGroup.SetDeadline(time.Now().Add(time.Second))
 	clientsGroup.Read(buffer)
 
 	clientsGroup.SetDeadline(time.Time{})
@@ -465,7 +464,7 @@ func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitectur
 	clientDoneWg.Add(1)
 
 	go func(wg *sync.WaitGroup) {
-		conn, cErr := net.DialTimeout(gainNet.TCP, fmt.Sprintf("localhost:%d", port), time.Second)
+		conn, cErr := net.DialTimeout(gainNet.TCP, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 		Nil(t, cErr)
 		NotNil(t, conn)
 		testData := []byte("testdata1234567890")
@@ -496,6 +495,13 @@ func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitectur
 
 func testLargeRead(t *testing.T, network string, architecture gain.ServerArchitecture) {
 	t.Helper()
+
+	if !checkKernelCompatibility(5, 19) {
+		//nolint
+		fmt.Println("Not supported by kernel")
+
+		return
+	}
 
 	doublePageSize := os.Getpagesize() * 4
 	data := make([]byte, doublePageSize)

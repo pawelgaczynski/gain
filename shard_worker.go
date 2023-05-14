@@ -151,8 +151,6 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 			w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
 			conn.setUserSpace()
 			w.eventHandler.OnWrite(conn, n)
-			// conn.setUserSpace()
-			// w.eventHandler.OnWrite(conn)
 		}
 
 	default:

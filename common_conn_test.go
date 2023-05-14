@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/pawelgaczynski/gain"
-	"github.com/rs/zerolog"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -121,7 +120,7 @@ type testConnClient struct {
 }
 
 func (c *testConnClient) Dial() {
-	conn, err := net.DialTimeout(c.network, fmt.Sprintf("localhost:%d", c.port), time.Millisecond*500)
+	conn, err := net.DialTimeout(c.network, fmt.Sprintf("127.0.0.1:%d", c.port), time.Second)
 	Nil(c.t, err)
 	NotNil(c.t, conn)
 	c.conn = conn
@@ -212,7 +211,7 @@ func newTestConnServer(
 ) (gain.Server, int) {
 	t.Helper()
 	opts := []gain.ConfigOption{
-		gain.WithLoggerLevel(zerolog.FatalLevel),
+		gain.WithLoggerLevel(getTestLoggerLevel()),
 		gain.WithWorkers(4),
 		gain.WithArchitecture(architecture),
 		gain.WithAsyncHandler(async),
@@ -224,7 +223,7 @@ func newTestConnServer(
 	testPort := getTestPort()
 
 	go func() {
-		err := server.Start(fmt.Sprintf("%s://localhost:%d", network, testPort))
+		err := server.Start(fmt.Sprintf("%s://127.0.0.1:%d", network, testPort))
 		if err != nil {
 			log.Panic(err)
 		}
@@ -252,7 +251,7 @@ func testConnAddress(
 	t.Helper()
 	numberOfClients := 10
 	opts := []gain.ConfigOption{
-		gain.WithLoggerLevel(zerolog.FatalLevel),
+		gain.WithLoggerLevel(getTestLoggerLevel()),
 		gain.WithWorkers(4),
 		gain.WithArchitecture(architecture),
 	}
@@ -305,7 +304,7 @@ func testConnAddress(
 	testPort := getTestPort()
 
 	go func() {
-		serverErr := server.Start(fmt.Sprintf("%s://localhost:%d", network, testPort))
+		serverErr := server.Start(fmt.Sprintf("%s://127.0.0.1:%d", network, testPort))
 		if err != nil {
 			log.Panic(serverErr)
 		}

@@ -16,11 +16,81 @@ package gain_test
 
 import (
 	"net"
+	"os"
 	"reflect"
+	"strconv"
+	"strings"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/pawelgaczynski/gain"
+	"github.com/rs/zerolog"
 )
+
+var testLoggerLevel = os.Getenv("TEST_LOGGER_LEVEL")
+
+func getTestLoggerLevel() zerolog.Level {
+	if testLoggerLevel == "" {
+		return zerolog.FatalLevel
+	}
+
+	loggerLevel, err := zerolog.ParseLevel(testLoggerLevel)
+	if err != nil {
+		return zerolog.FatalLevel
+	}
+
+	return loggerLevel
+}
+
+func int8ToStr(arr []int8) string {
+	buffer := make([]byte, 0, len(arr))
+
+	for _, v := range arr {
+		if v == 0x00 {
+			break
+		}
+
+		buffer = append(buffer, byte(v))
+	}
+
+	return string(buffer)
+}
+
+func checkKernelCompatibility(expectedKernelVersion, expectedMajorVersion int) bool {
+	var uname syscall.Utsname
+
+	err := syscall.Uname(&uname)
+	if err != nil {
+		return false
+	}
+
+	kernelString := int8ToStr(uname.Release[:])
+
+	kernelParts := strings.Split(kernelString, ".")
+	if len(kernelParts) < 2 {
+		return false
+	}
+
+	kernelVersion, err := strconv.Atoi(kernelParts[0])
+	if err != nil {
+		return false
+	}
+
+	majorVersion, err := strconv.Atoi(kernelParts[1])
+	if err != nil {
+		return false
+	}
+
+	if expectedKernelVersion < kernelVersion {
+		return true
+	}
+
+	if expectedMajorVersion < majorVersion {
+		return true
+	}
+
+	return false
+}
 
 var port int32 = 9000
 

@@ -14,7 +14,9 @@
 
 package iouring_test
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 var port int32 = 8000
 

@@ -16,15 +16,17 @@ package gain_test
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/pawelgaczynski/gain"
-	"github.com/pawelgaczynski/gain/pkg/errors"
+	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
 	. "github.com/stretchr/testify/require"
 )
@@ -52,9 +54,9 @@ func testHandlerMethod(
 
 	server, port := newTestConnServer(t, network, asyncHandler, architecture, eventHandlerTester)
 
-	conn, err := net.DialTimeout(network, fmt.Sprintf("localhost:%d", port), time.Second*500)
-	if err != nil {
-		conn, err = net.DialTimeout(network, fmt.Sprintf("localhost:%d", port), time.Second*500)
+	conn, err := net.DialTimeout(network, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
+	if err != nil && !errors.Is(err, syscall.ECONNRESET) {
+		conn, err = net.DialTimeout(network, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -78,13 +80,13 @@ func testHandlerMethod(
 		eventHandlerTester.onCloseWg.Wait()
 	}
 
+	eventHandlerTester.finished.Store(true)
+
 	Equal(t, 1, int(eventHandlerTester.onStartCount.Load()))
 	Equal(t, callCounts[0], int(eventHandlerTester.onAcceptCount.Load()))
 	Equal(t, callCounts[1], int(eventHandlerTester.onReadCount.Load()))
 	Equal(t, callCounts[2], int(eventHandlerTester.onWriteCount.Load()))
 	Equal(t, callCounts[3], int(eventHandlerTester.onCloseCount.Load()))
-
-	eventHandlerTester.finished.Store(true)
 
 	server.Shutdown()
 }
@@ -185,16 +187,31 @@ func TestEventHandlerOnRead(t *testing.T) {
 		},
 	}
 	clientBehavior := func(conn net.Conn) {
+		err := conn.SetWriteDeadline(time.Now().Add(time.Millisecond * 500))
+		if err != nil {
+			log.Panic(err)
+		}
+
 		n, err := conn.Write(eventHandlerTestData)
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
+		buffer := make([]byte, 1024)
+
+		err = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 500))
+		if err != nil {
+			log.Panic(err)
+		}
+		n, err = conn.Read(buffer)
+		Equal(t, n, 0)
+		NotNil(t, err)
+		conn.Close()
 	}
 
 	testCases := createTestCases("JustRead", both, callbacks, clientBehavior, [][]int{
-		{1, 1, 0, 0},
-		{1, 1, 0, 0},
-		{1, 1, 0, 0},
-		{1, 1, 0, 0},
+		{1, 1, 0, 1},
+		{1, 1, 0, 1},
+		{1, 1, 0, 1},
+		{1, 1, 0, 1},
 		{0, 1, 0, 0},
 		{0, 1, 0, 0},
 	})
@@ -225,13 +242,14 @@ func TestEventHandlerOnRead(t *testing.T) {
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
 		Equal(t, eventHandlerTestData, buffer[:eventHandlerTestDataSize])
+		conn.Close()
 	}
 
 	testCases = createTestCases("ReadAndWrite", both, callbacks, clientBehavior, [][]int{
-		{1, 1, 1, 0},
-		{1, 1, 1, 0},
-		{1, 1, 1, 0},
-		{1, 1, 1, 0},
+		{1, 1, 1, 1},
+		{1, 1, 1, 1},
+		{1, 1, 1, 1},
+		{1, 1, 1, 1},
 		{0, 1, 1, 0},
 		{0, 1, 1, 0},
 	})
@@ -252,7 +270,7 @@ func TestEventHandlerOnRead(t *testing.T) {
 		onWriteCallback: func(conn gain.Conn, n int) {
 			buf, err := conn.Next(-1)
 			Equal(t, 0, len(buf))
-			Equal(t, errors.ErrConnectionClosed, err)
+			Equal(t, gainErrors.ErrConnectionClosed, err)
 		},
 	}
 	clientBehavior = func(conn net.Conn) {
@@ -286,10 +304,12 @@ func TestEventHandlerOnAccept(t *testing.T) {
 		},
 	}
 	clientBehavior := func(conn net.Conn) {
-		time.Sleep(time.Millisecond * 50)
-		n, err := conn.Write(eventHandlerTestData)
-		Equal(t, 0, n)
-		NotNil(t, err)
+		if conn != nil {
+			time.Sleep(time.Millisecond * 50)
+			n, err := conn.Write(eventHandlerTestData)
+			Equal(t, 0, n)
+			NotNil(t, err)
+		}
 	}
 
 	testCases := createTestCases("JustClose", tcp, callbacks, clientBehavior, [][]int{
@@ -350,13 +370,14 @@ func TestEventHandlerOnAccept(t *testing.T) {
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
 		Equal(t, eventHandlerTestData, buffer[:eventHandlerTestDataSize])
+		conn.Close()
 	}
 
 	testCases = createTestCases("Write", tcp, callbacks, clientBehavior, [][]int{
-		{1, 0, 1, 0},
-		{1, 0, 1, 0},
-		{1, 0, 1, 0},
-		{1, 0, 1, 0},
+		{1, 0, 1, 1},
+		{1, 0, 1, 1},
+		{1, 0, 1, 1},
+		{1, 0, 1, 1},
 	})
 
 	testEventHandler(t, testCases)
@@ -428,13 +449,15 @@ func TestEventHandlerOnWrite(t *testing.T) {
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer[:eventHandlerTestDataSize])
 		}
+
+		conn.Close()
 	}
 
 	testCases := createTestCases("AdditionalWrite", tcp, callbacks, clientBehavior, [][]int{
-		{1, 1, 2, 0},
-		{1, 1, 2, 0},
-		{1, 1, 2, 0},
-		{1, 1, 2, 0},
+		{1, 1, 2, 1},
+		{1, 1, 2, 1},
+		{1, 1, 2, 1},
+		{1, 1, 2, 1},
 	})
 
 	testEventHandler(t, testCases)

@@ -153,7 +153,7 @@ func TestUDPRecvSend(t *testing.T) {
 
 	clientConnChan := make(chan net.Conn)
 	go func() {
-		conn, cErr := net.DialTimeout("udp", fmt.Sprintf("localhost:%d", testPort), time.Second)
+		conn, cErr := net.DialTimeout("udp", fmt.Sprintf("127.0.0.1:%d", testPort), time.Second)
 		Nil(t, cErr)
 		NotNil(t, conn)
 		bytesWritten, cErr := conn.Write([]byte("testdata1234567890"))
