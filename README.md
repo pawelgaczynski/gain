@@ -9,6 +9,7 @@
   [![Apache 2.0 License][license-shield]][license-url]
   [![Go Reference](https://pkg.go.dev/badge/github.com/pawelgaczynski/gain.svg)](https://pkg.go.dev/github.com/pawelgaczynski/gain)
   [![Go Report Card](https://goreportcard.com/badge/github.com/pawelgaczynski/gain)](https://goreportcard.com/report/github.com/pawelgaczynski/gain)
+  [![codecov](https://codecov.io/gh/pawelgaczynski/gain/branch/main/graph/badge.svg?token=WL8PYKPNM2)](https://codecov.io/gh/pawelgaczynski/gain)
 
   <h2 align="center">Gain</h2>
 
