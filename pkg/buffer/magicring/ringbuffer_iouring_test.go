@@ -200,7 +200,7 @@ func TestMagicRingRecvSend(t *testing.T) {
 
 	clientConnChan := make(chan net.Conn)
 	go func() {
-		conn, cErr := net.DialTimeout(gainNet.TCP, fmt.Sprintf("localhost:%d", 9876), time.Second)
+		conn, cErr := net.DialTimeout(gainNet.TCP, fmt.Sprintf("127.0.0.1:%d", 9876), time.Second)
 		Nil(t, cErr)
 		NotNil(t, conn)
 

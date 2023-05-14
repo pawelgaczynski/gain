@@ -92,7 +92,7 @@ func runClients() {
 		go func() {
 			time.Sleep(time.Second)
 
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), time.Second)
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 			if err != nil {
 				log.Panic(err)
 			}
@@ -124,7 +124,7 @@ func main() {
 	runClients()
 
 	err := gain.ListenAndServe(
-		fmt.Sprintf("tcp://localhost:%d", port), &EventHandler{}, gain.WithLoggerLevel(logger.WarnLevel))
+		fmt.Sprintf("tcp://127.0.0.1:%d", port), &EventHandler{}, gain.WithLoggerLevel(logger.WarnLevel))
 	if err != nil {
 		log.Panic(err)
 	}

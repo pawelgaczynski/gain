@@ -54,11 +54,11 @@ func testHandlerMethod(
 
 	server, port := newTestConnServer(t, network, asyncHandler, architecture, eventHandlerTester)
 
-	fmt.Println("testHandlerMethod -> connecting to: ", fmt.Sprintf("%s://localhost:%d", network, port))
+	fmt.Println("testHandlerMethod -> connecting to: ", fmt.Sprintf("%s://127.0.0.1:%d", network, port))
 
-	conn, err := net.DialTimeout(network, fmt.Sprintf("localhost:%d", port), time.Second)
+	conn, err := net.DialTimeout(network, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 	if err != nil && !errors.Is(err, syscall.ECONNRESET) {
-		conn, err = net.DialTimeout(network, fmt.Sprintf("localhost:%d", port), time.Second)
+		conn, err = net.DialTimeout(network, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 		if err != nil {
 			log.Panic(err)
 		}

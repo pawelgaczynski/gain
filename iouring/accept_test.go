@@ -68,7 +68,7 @@ func TestAccept(t *testing.T) {
 
 	clientConnChan := make(chan net.Conn)
 	go func() {
-		conn, dialErr := net.DialTimeout(gnet.TCP, fmt.Sprintf("localhost:%d", testPort), time.Second)
+		conn, dialErr := net.DialTimeout(gnet.TCP, fmt.Sprintf("127.0.0.1:%d", testPort), time.Second)
 		Nil(t, dialErr)
 		clientConnChan <- conn
 	}()

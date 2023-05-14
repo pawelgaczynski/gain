@@ -191,7 +191,7 @@ var deafultAfterDial = func(t *testing.T, conn net.Conn, repeats, clientIndex in
 
 func dialClient(t *testing.T, protocol string, port int, clientConnChan chan net.Conn) {
 	t.Helper()
-	conn, err := net.DialTimeout(protocol, fmt.Sprintf("localhost:%d", port), time.Second)
+	conn, err := net.DialTimeout(protocol, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 	Nil(t, err)
 	NotNil(t, conn)
 	clientConnChan <- conn
@@ -201,7 +201,7 @@ func dialClientRW(t *testing.T, protocol string, port int,
 	afterDial afterDialCallback, repeats, clientIndex int, clientConnChan chan net.Conn,
 ) {
 	t.Helper()
-	conn, err := net.DialTimeout(protocol, fmt.Sprintf("localhost:%d", port), 2*time.Second)
+	conn, err := net.DialTimeout(protocol, fmt.Sprintf("127.0.0.1:%d", port), 2*time.Second)
 	Nil(t, err)
 	NotNil(t, conn)
 	afterDial(t, conn, repeats, clientIndex)
@@ -253,7 +253,7 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 	testPort := getTestPort()
 
 	go func() {
-		err := server.Start(fmt.Sprintf("%s://localhost:%d", testConfig.protocol, testPort))
+		err := server.Start(fmt.Sprintf("%s://127.0.0.1:%d", testConfig.protocol, testPort))
 		if err != nil {
 			log.Panic(err)
 		}
@@ -464,7 +464,7 @@ func testCloseConn(t *testing.T, async bool, architecture gain.ServerArchitectur
 	clientDoneWg.Add(1)
 
 	go func(wg *sync.WaitGroup) {
-		conn, cErr := net.DialTimeout(gainNet.TCP, fmt.Sprintf("localhost:%d", port), time.Second)
+		conn, cErr := net.DialTimeout(gainNet.TCP, fmt.Sprintf("127.0.0.1:%d", port), time.Second)
 		Nil(t, cErr)
 		NotNil(t, conn)
 		testData := []byte("testdata1234567890")
