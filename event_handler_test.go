@@ -52,6 +52,8 @@ func testHandlerMethod(
 
 	server, port := newTestConnServer(t, network, asyncHandler, architecture, eventHandlerTester)
 
+	fmt.Println("testHandlerMethod -> connecting to: ", fmt.Sprintf("localhost:%d", port))
+
 	conn, err := net.DialTimeout(network, fmt.Sprintf("localhost:%d", port), time.Second)
 	if err != nil {
 		conn, err = net.DialTimeout(network, fmt.Sprintf("localhost:%d", port), time.Second)

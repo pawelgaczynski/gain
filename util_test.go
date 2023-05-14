@@ -15,6 +15,7 @@
 package gain_test
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"reflect"
@@ -95,7 +96,11 @@ func checkKernelCompatibility(expectedKernelVersion, expectedMajorVersion int) b
 var port int32 = 9000
 
 func getTestPort() int {
-	return int(atomic.AddInt32(&port, 1))
+	res := int(atomic.AddInt32(&port, 1))
+
+	fmt.Println("Getting test port: ", res)
+
+	return res
 }
 
 type onStartCallback func(server gain.Server)
