@@ -1,6 +1,22 @@
+// Copyright (c) 2023 Paweł Gaczyński
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package iouring_test
 
 import (
+	"fmt"
+	"syscall"
 	"testing"
 
 	"github.com/pawelgaczynski/gain/iouring"
@@ -10,6 +26,7 @@ import (
 func TestMsgRingItself(t *testing.T) {
 	ring, err := iouring.CreateRing()
 	Nil(t, err)
+
 	defer ring.Close()
 
 	entry, err := ring.GetSQE()
@@ -27,14 +44,27 @@ func TestMsgRingItself(t *testing.T) {
 	entry.PrepareMsgRing(ring.Fd(), 500, 600, 0)
 	entry.UserData = 345
 
-	cqeNr, err := ring.Submit()
+	numberOfCQEsSubmitted, err := ring.Submit()
 	Nil(t, err)
-	Equal(t, uint(3), cqeNr)
+
+	if numberOfCQEsSubmitted == 1 {
+		cqe, cqeErr := ring.WaitCQE()
+		Nil(t, cqeErr)
+
+		if cqe.Res() == -int32(syscall.EINVAL) || cqe.Res() == -int32(syscall.EOPNOTSUPP) {
+			//nolint
+			fmt.Println("Skipping test because of no msg support")
+
+			return
+		}
+	}
+
+	Equal(t, uint(3), numberOfCQEsSubmitted)
 
 	cqes := make([]*iouring.CompletionQueueEvent, 128)
-	Nil(t, err)
-	n := ring.PeekBatchCQE(cqes)
-	Equal(t, 6, n)
+
+	numberOfCQEs := ring.PeekBatchCQE(cqes)
+	Equal(t, 6, numberOfCQEs)
 
 	cqe := cqes[0]
 	Equal(t, uint64(200), cqe.UserData())
@@ -60,16 +90,18 @@ func TestMsgRingItself(t *testing.T) {
 	Equal(t, uint64(345), cqe.UserData())
 	Equal(t, int32(0), cqe.Res())
 
-	ring.CQAdvance(uint32(n))
+	ring.CQAdvance(uint32(numberOfCQEs))
 }
 
 func TestMsgRing(t *testing.T) {
 	senderRing, err := iouring.CreateRing()
 	Nil(t, err)
+
 	defer senderRing.Close()
 
 	receiverRing, err := iouring.CreateRing()
 	Nil(t, err)
+
 	defer receiverRing.Close()
 
 	entry, err := senderRing.GetSQE()
@@ -86,12 +118,25 @@ func TestMsgRing(t *testing.T) {
 
 	cqeNr, err := senderRing.Submit()
 	Nil(t, err)
+
+	if cqeNr == 1 {
+		cqe, cqeErr := senderRing.WaitCQE()
+		Nil(t, cqeErr)
+
+		if cqe.Res() == -int32(syscall.EINVAL) || cqe.Res() == -int32(syscall.EOPNOTSUPP) {
+			//nolint
+			fmt.Println("Skipping test because of no msg support")
+
+			return
+		}
+	}
+
 	Equal(t, uint(3), cqeNr)
 
 	cqes := make([]*iouring.CompletionQueueEvent, 128)
-	Nil(t, err)
-	n := receiverRing.PeekBatchCQE(cqes)
-	Equal(t, 3, n)
+
+	numberOfCQEs := receiverRing.PeekBatchCQE(cqes)
+	Equal(t, 3, numberOfCQEs)
 
 	cqe := cqes[0]
 	Equal(t, uint64(200), cqe.UserData())
@@ -104,5 +149,5 @@ func TestMsgRing(t *testing.T) {
 	cqe = cqes[2]
 	Equal(t, uint64(600), cqe.UserData())
 	Equal(t, int32(500), cqe.Res())
-	receiverRing.CQAdvance(uint32(n))
+	receiverRing.CQAdvance(uint32(numberOfCQEs))
 }

@@ -1,8 +1,23 @@
+// Copyright (c) 2023 Paweł Gaczyński
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package iouring
 
 import (
 	"fmt"
 	"log"
+	"os"
 	"syscall"
 	"unsafe"
 )
@@ -22,12 +37,14 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 	)
 	cqeSize := unsafe.Sizeof(CompletionQueueEvent{})
 	ring.cqRing.ringSize = uint64(ring.params.cqOff.cqes) + uint64(ring.params.cqEntries*(uint32)(cqeSize))
+
 	if ring.params.features&FeatSingleMMap > 0 {
 		if ring.cqRing.ringSize > ring.sqRing.ringSize {
 			ring.sqRing.ringSize = ring.cqRing.ringSize
 		}
 		ring.cqRing.ringSize = ring.sqRing.ringSize
 	}
+
 	data, err := syscall.Mmap(
 		fileDescriptor,
 		int64(offsqRing),
@@ -36,8 +53,9 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 		syscall.MAP_SHARED|syscall.MAP_POPULATE,
 	)
 	if err != nil {
-		return err
+		return os.NewSyscallError("mmap", err)
 	}
+
 	ring.sqRing.buffer = data
 	if ring.params.features&FeatSingleMMap > 0 {
 		ring.cqRing.buffer = ring.sqRing.buffer
@@ -50,7 +68,8 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 			if unmapErr != nil {
 				log.Panic(unmapErr)
 			}
-			return err
+
+			return fmt.Errorf("failed to unmap rings: %w", err)
 		}
 		ring.cqRing.buffer = data
 	}
@@ -69,6 +88,7 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 	)
 	ring.sqRing.array = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(ringStart)) + uintptr(ring.params.sqOff.array)))
 	sz := uintptr(ring.params.sqEntries) * unsafe.Sizeof(SubmissionQueueEntry{})
+
 	buff, err := syscall.Mmap(
 		fileDescriptor,
 		int64(offSQEs),
@@ -81,7 +101,8 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 		if unmapErr != nil {
 			log.Panic(unmapErr)
 		}
-		return err
+
+		return fmt.Errorf("failed to unmap rings: %w", err)
 	}
 	ring.sqRing.sqeBuffer = buff
 	cqRingPtr := uintptr(unsafe.Pointer(&ring.cqRing.buffer[0]))
@@ -100,24 +121,32 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 	ring.cqRing.cqeBuff = (*CompletionQueueEvent)(
 		unsafe.Pointer(uintptr(unsafe.Pointer(ringStart)) + uintptr(ring.params.cqOff.cqes)),
 	)
+
 	if ring.params.cqOff.flags != 0 {
 		ring.cqRing.flags = cqRingPtr + uintptr(ring.params.cqOff.flags)
 	}
+
 	return nil
 }
 
 func (ring *Ring) munmap() error {
-	return syscall.Munmap(ring.sqRing.sqeBuffer)
+	return os.NewSyscallError("munmap", syscall.Munmap(ring.sqRing.sqeBuffer))
 }
 
 func (ring *Ring) UnmapRings() error {
 	var firstErr, secondErr error
 	firstErr = syscall.Munmap(ring.sqRing.buffer)
+
 	if ring.cqRing.buffer != nil && &ring.cqRing.buffer[0] != &ring.sqRing.buffer[0] {
 		secondErr = syscall.Munmap(ring.cqRing.buffer)
 	}
+
 	if firstErr != nil || secondErr != nil {
-		return fmt.Errorf("unmap first error: %s, second error: %s", firstErr.Error(), secondErr.Error()) // nolint: errorlint
+		//nolint:errorlint,goerr113
+		return fmt.Errorf(
+			"unmap first error: %s, second error: %s", firstErr.Error(), secondErr.Error(),
+		)
 	}
+
 	return nil
 }

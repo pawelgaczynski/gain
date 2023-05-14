@@ -1,3 +1,17 @@
+// Copyright (c) 2023 Paweł Gaczyński
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package iouring
 
 import (
@@ -26,8 +40,11 @@ func (ring *Ring) enter2(
 	size int,
 	raw bool,
 ) (uint, error) {
-	var consumed uintptr
-	var errno syscall.Errno
+	var (
+		consumed uintptr
+		errno    syscall.Errno
+	)
+
 	if raw {
 		consumed, _, errno = syscall.RawSyscall6(
 			sysEnter,
@@ -49,6 +66,7 @@ func (ring *Ring) enter2(
 			uintptr(size),
 		)
 	}
+
 	switch errno {
 	case syscall.ETIME:
 		return 0, ErrTimerExpired
@@ -61,5 +79,6 @@ func (ring *Ring) enter2(
 			return 0, os.NewSyscallError("io_uring_enter", errno)
 		}
 	}
+
 	return uint(consumed), nil
 }

@@ -75,7 +75,7 @@ Gain requires Go 1.18+
 
 1. Install the framework
    ```sh
-   go get -u github.com/pawelgaczynski/gain@v0.1.0-alpha
+   go get -u github.com/pawelgaczynski/gain@v0.2.0-alpha
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -89,15 +89,17 @@ Gain requires Go 1.18+
 - [x] Lock-free
 - [ ] Protocols
     - [x] TCP
-    - [ ] UDP
+    - [x] UDP
     - [ ] Unix Domain Socket
 - [ ] Load balancing
     - [x] Round robin
     - [x] Least connection
-    - [ ] Source IP hash
+    - [x] Source IP hash
+    - [ ] Support for custom implementations
+- [ ] Support for read and write deadlines
 - [ ] Further io_uring optimizations
-- [ ] More flexible connection buffer
-- [ ] Documentation
+- [x] More flexible connection buffer
+- [x] Documentation
 - [x] Support for kernels older than 5.15
 - [ ] Support for Windows - IoRing ([documentation](https://learn.microsoft.com/en-us/windows/win32/api/ioringapi/))
 
@@ -186,8 +188,6 @@ Project Link: [https://github.com/pawelgaczynski/gain](https://github.com/pawelg
 
 
 ## Relevant Articles
-
-Use this space to list resources you find helpful and would like to give credit to. I've included a few of my favorites to kick things off!
 
 * [Lord of the io_uring](https://unixism.net/loti/what_is_io_uring.html)
 * [Ringing in a new asynchronous I/O API](https://lwn.net/Articles/776703/)
