@@ -59,6 +59,7 @@ func testHandlerMethod(
 			log.Panic(err)
 		}
 	}
+	fmt.Println("testHandlerMethod -> client connected!")
 
 	clientBehavior(conn)
 
@@ -179,13 +180,16 @@ func createTestCases(
 func TestEventHandlerOnRead(t *testing.T) {
 	callbacks := callbacksHolder{
 		onReadCallback: func(conn gain.Conn, n int) {
+			fmt.Println("TestEventHandlerOnRead -> onReadCallback...")
 			buffer, err := conn.Next(n)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
 		},
 	}
 	clientBehavior := func(conn net.Conn) {
+		fmt.Println("TestEventHandlerOnRead -> client connected. Try to write...")
 		n, err := conn.Write(eventHandlerTestData)
+		fmt.Println("TestEventHandlerOnRead -> client connected. Bytes written: ", n)
 		Equal(t, eventHandlerTestDataSize, n)
 		Nil(t, err)
 	}
