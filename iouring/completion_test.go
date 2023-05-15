@@ -12,18 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package iouring_test
+package iouring
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	"github.com/stretchr/testify/assert"
 	. "github.com/stretchr/testify/require"
 )
 
-func queueNOPs(t *testing.T, ring *iouring.Ring, number int, offset int) error {
+func queueNOPs(t *testing.T, ring *Ring, number int, offset int) error {
 	t.Helper()
 
 	for i := 0; i < number; i++ {
@@ -42,12 +41,12 @@ func queueNOPs(t *testing.T, ring *iouring.Ring, number int, offset int) error {
 }
 
 func TestPeekBatchCQE(t *testing.T) {
-	ring, err := iouring.CreateRing()
+	ring, err := CreateRing()
 	NoError(t, err)
 
 	defer ring.Close()
 
-	cqeBuff := make([]*iouring.CompletionQueueEvent, 16)
+	cqeBuff := make([]*CompletionQueueEvent, 16)
 
 	cnt := ring.PeekBatchCQE(cqeBuff)
 	Equal(t, 0, cnt)
@@ -72,4 +71,23 @@ func TestPeekBatchCQE(t *testing.T) {
 	}
 
 	ring.CQAdvance(uint32(4))
+}
+
+func TestCQEFlagsString(t *testing.T) {
+	var cqe CompletionQueueEvent
+
+	cqe.flags = CQEFBuffer
+	Equal(t, "CQEFBuffer", cqe.FlagsString())
+
+	cqe.flags = CQEFMore
+	Equal(t, "CQEFMore", cqe.FlagsString())
+
+	cqe.flags = CQEFSockNonempty
+	Equal(t, "CQEFSockNonempty", cqe.FlagsString())
+
+	cqe.flags = CQEFNotif
+	Equal(t, "CQEFNotif", cqe.FlagsString())
+
+	cqe.flags = CQEFBuffer | CQEFMore | CQEFSockNonempty | CQEFNotif
+	Equal(t, "CQEFBuffer | CQEFMore | CQEFSockNonempty | CQEFNotif", cqe.FlagsString())
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package iouring_test
+package iouring
 
 import (
 	"runtime"
@@ -20,17 +20,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	. "github.com/stretchr/testify/require"
 )
 
 func TestSubmitAndWait(t *testing.T) {
-	ring, err := iouring.CreateRing()
+	ring, err := CreateRing()
 	NoError(t, err)
 
 	defer ring.Close()
 
-	cqeBuff := make([]*iouring.CompletionQueueEvent, 16)
+	cqeBuff := make([]*CompletionQueueEvent, 16)
 
 	cnt := ring.PeekBatchCQE(cqeBuff)
 	Equal(t, 0, cnt)
@@ -45,12 +44,12 @@ func TestSubmitAndWait(t *testing.T) {
 }
 
 func TestSubmitAndWaitNilTimeout(t *testing.T) {
-	ring, err := iouring.CreateRing()
+	ring, err := CreateRing()
 	NoError(t, err)
 
 	defer ring.Close()
 
-	cqeBuff := make([]*iouring.CompletionQueueEvent, 16)
+	cqeBuff := make([]*CompletionQueueEvent, 16)
 
 	cnt := ring.PeekBatchCQE(cqeBuff)
 	Equal(t, 0, cnt)

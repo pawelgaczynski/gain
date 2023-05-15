@@ -158,6 +158,10 @@ func (c *connection) userOpAllowed(name string) error {
 }
 
 func (c *connection) SetReadBuffer(bytes int) error {
+	err := c.userOpAllowed("setReadBuffer")
+	if err != nil {
+		return err
+	}
 	//nolint:wrapcheck
 	return socket.SetRecvBuffer(c.fd, bytes)
 }

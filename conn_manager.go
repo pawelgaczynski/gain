@@ -14,11 +14,14 @@
 
 package gain
 
+import "sync/atomic"
+
 type connectionManager struct {
-	connections  map[int]*connection
-	closing      bool
-	releaseFdSet map[int]void
-	keyPool      *keyPool
+	connections      map[int]*connection
+	connectionsCount atomic.Int32
+	closing          bool
+	releaseFdSet     map[int]void
+	keyPool          *keyPool
 }
 
 func (c *connectionManager) fork(conn *connection, write bool) *connection {
@@ -27,6 +30,7 @@ func (c *connectionManager) fork(conn *connection, write bool) *connection {
 	forked := getConnection()
 	forked = conn.fork(forked, key, write)
 	c.connections[key] = forked
+	c.connectionsCount.Add(1)
 
 	return forked
 }
@@ -45,6 +49,7 @@ func (c *connectionManager) get(key int, fd int) *connection {
 	conn.fd = fd
 	conn.key = key
 	c.connections[key] = conn
+	c.connectionsCount.Add(1)
 
 	return conn
 }
@@ -53,6 +58,7 @@ func (c *connectionManager) release(key int) {
 	conn, ok := c.connections[key]
 	if ok {
 		delete(c.connections, key)
+		c.connectionsCount.Add(-1)
 		putConnection(conn)
 		delete(c.releaseFdSet, key)
 		c.keyPool.put(uint64(conn.key))
@@ -78,16 +84,8 @@ func (c *connectionManager) allClosed() bool {
 	return c.closing && len(c.releaseFdSet) == 0
 }
 
-func (c *connectionManager) activeConnections(filter func(c *connection) bool) int {
-	count := 0
-
-	for _, conn := range c.connections {
-		if filter(conn) {
-			count++
-		}
-	}
-
-	return count
+func (c *connectionManager) activeConnections() int {
+	return int(c.connectionsCount.Load())
 }
 
 func newConnectionManager() *connectionManager {

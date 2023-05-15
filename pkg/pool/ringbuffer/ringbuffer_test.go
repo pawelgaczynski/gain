@@ -15,8 +15,11 @@
 package ringbuffer
 
 import (
+	"os"
+	"runtime"
 	"testing"
 
+	"github.com/pawelgaczynski/gain/pkg/buffer/magicring"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -65,4 +68,26 @@ func TestIndexRingBufferPool(t *testing.T) {
 	Equal(t, 14, idx)
 	idx = indexRingBufferPool(134217728)
 	Equal(t, 14, idx)
+}
+
+func TestRingBufferPool(t *testing.T) {
+	pool := NewRingBufferPool()
+
+	ringBuffer := magicring.NewMagicBuffer(os.Getpagesize())
+
+	pool.Put(ringBuffer)
+
+	ringBufferFromPool := pool.Get()
+
+	Equal(t, ringBuffer, ringBufferFromPool)
+	runtime.KeepAlive(ringBuffer)
+
+	ringBuffer = Get()
+
+	Put(ringBuffer)
+
+	ringBufferFromPool = Get()
+
+	Equal(t, ringBuffer, ringBufferFromPool)
+	runtime.KeepAlive(ringBuffer)
 }

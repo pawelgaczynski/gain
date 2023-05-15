@@ -118,7 +118,7 @@ func (ring *Ring) PeekBatchCQE(cqes []*CompletionQueueEvent) int {
 				flags |= EnterRegisteredRing
 			}
 
-			_, _ = ring.enter(0, 0, flags, nil, false)
+			_, _ = ring.enter(0, 0, flags, nil)
 			numberOfCQEs = ring.peekBatchCQEInternal(cqes)
 		}
 	}
@@ -186,7 +186,7 @@ func (ring *Ring) getCQEAndEnter(getData *getData) (*CompletionQueueEvent, error
 
 		var consumed uint
 
-		consumed, err = ring.enter2(getData.submit, getData.waitNr, flags, getData.arg, getData.sz, false)
+		consumed, err = ring.enter2(getData.submit, getData.waitNr, flags, getData.arg, getData.sz)
 		if err != nil {
 			break
 		}

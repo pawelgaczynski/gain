@@ -165,7 +165,7 @@ func (ring *Ring) SubmitInternal(submitted uint32, waitNr uint64) (uint, error) 
 		if ring.intFlags&IntFlagRegRing > 0 {
 			flags |= EnterRegisteredRing
 		}
-		ret, err = ring.enter(submitted, uint32(waitNr), flags, nil, false)
+		ret, err = ring.enter(submitted, uint32(waitNr), flags, nil)
 	} else {
 		ret = uint(submitted)
 	}
@@ -247,7 +247,7 @@ func (ring *Ring) sqRingWaitInternal() (uint, error) {
 		flags |= EnterRegisteredRing
 	}
 
-	return ring.enter(0, 0, flags, nil, false)
+	return ring.enter(0, 0, flags, nil)
 }
 
 //nolint:unused

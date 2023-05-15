@@ -29,9 +29,7 @@ var (
 	ErrUnsupportedUDPProtocol = errors.New("only udp/udp4/udp6 are supported")
 	// ErrNoIPv4AddressOnInterface occurs when an IPv4 multicast address is set on an interface but IPv4 is not configured.
 	ErrNoIPv4AddressOnInterface = errors.New("no IPv4 address on interface")
-	// ErrNotImplemented occurs when not implemented feature is used.
-	ErrNotImplemented = errors.New("not implemented")
-	// ErrNotImplemented occurs when not supported feature is used.
+	// ErrNotSupported occurs when not supported feature is used.
 	ErrNotSupported = errors.New("not supported")
 	// ErrSkippable indicates an error that can be skipped and not handled as an usual flow breaking error.
 	ErrSkippable = errors.New("skippable")

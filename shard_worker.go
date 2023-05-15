@@ -93,9 +93,7 @@ func (w *shardWorker) stopAccept() error {
 }
 
 func (w *shardWorker) activeConnections() int {
-	return w.connectionManager.activeConnections(func(c *connection) bool {
-		return c.fd != w.fd
-	})
+	return w.connectionManager.activeConnections() - 1
 }
 
 func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueEvent) {

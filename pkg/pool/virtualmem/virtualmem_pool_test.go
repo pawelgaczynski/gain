@@ -12,21 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package iouring
+package virtualmem
 
 import (
-	"errors"
-	"fmt"
+	"os"
+	"runtime"
+	"testing"
+
+	. "github.com/stretchr/testify/require"
 )
 
-var (
-	ErrNotSupported       = errors.New("not supported")
-	ErrTimerExpired       = errors.New("timer expired")
-	ErrInterrupredSyscall = errors.New("interrupred system call")
-	ErrAgain              = errors.New("try again")
-	ErrSQEOverflow        = errors.New("SQE overflow")
-)
+func TestVirtualMemPool(t *testing.T) {
+	pool := NewPool()
 
-func ErrorSQEOverflow(overflowValue uint32) error {
-	return fmt.Errorf("%w: %d", ErrSQEOverflow, overflowValue)
+	size := os.Getpagesize()
+	vm := NewVirtualMem(size)
+
+	pool.Put(vm)
+
+	vmFromPool := pool.Get(size)
+
+	Equal(t, vm, vmFromPool)
+	runtime.KeepAlive(vm)
+
+	vm = Get(size)
+
+	Put(vm)
+
+	vmFromPool = Get(size)
+
+	Equal(t, vm, vmFromPool)
+	runtime.KeepAlive(vm)
 }

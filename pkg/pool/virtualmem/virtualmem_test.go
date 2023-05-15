@@ -15,6 +15,7 @@
 package virtualmem
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -24,6 +25,8 @@ import (
 	"syscall"
 	"testing"
 	"unsafe"
+
+	. "github.com/stretchr/testify/require"
 )
 
 func deallocate(data []byte, size int) error {
@@ -284,4 +287,49 @@ func TestMemfdMMapAndUnmap(_ *testing.T) {
 	printCount()
 	printFds()
 	printList()
+}
+
+func TestVirtualMem(t *testing.T) {
+	vm := NewVirtualMem(os.Getpagesize())
+	NotNil(t, vm)
+	Equal(t, os.Getpagesize(), vm.Size)
+
+	Equal(t, os.Getpagesize()*2, len(vm.Buf))
+
+	dataSize := os.Getpagesize()
+	data := make([]byte, dataSize)
+	_, err := rand.Read(data)
+	Nil(t, err)
+
+	for i := range vm.Buf {
+		Zero(t, vm.Buf[i])
+	}
+
+	for i := 0; i < vm.Size; i++ {
+		vm.Buf[i] = data[i]
+	}
+
+	for i := 0; i < vm.Size; i++ {
+		Equal(t, vm.Buf[i], vm.Buf[i+vm.Size])
+	}
+
+	vm.Zeroes()
+
+	for i := range vm.Buf {
+		Zero(t, vm.Buf[i])
+	}
+
+	for i := 0; i < vm.Size; i++ {
+		vm.Buf[i+vm.Size] = data[i]
+	}
+
+	for i := 0; i < vm.Size; i++ {
+		Equal(t, vm.Buf[i], vm.Buf[i+vm.Size])
+	}
+
+	vm.Zeroes()
+
+	for i := range vm.Buf {
+		Zero(t, vm.Buf[i])
+	}
 }

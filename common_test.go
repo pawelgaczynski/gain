@@ -43,6 +43,7 @@ type testServerConfig struct {
 	waitForDialAllClients bool
 	afterDial             afterDialCallback
 	writesCount           int
+	configOptions         []gain.ConfigOption
 
 	readHandler onReadCallback
 }
@@ -239,6 +240,10 @@ func testServer(t *testing.T, testConfig testServerConfig, architecture gain.Ser
 		gain.WithWorkers(testConfig.numberOfWorkers),
 		gain.WithCBPF(false),
 		gain.WithArchitecture(architecture),
+	}
+
+	if testConfig.configOptions != nil {
+		opts = append(opts, testConfig.configOptions...)
 	}
 
 	config := gain.NewConfig(opts...)
