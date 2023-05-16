@@ -226,39 +226,3 @@ func (ring *Ring) SubmitAndWaitTimeout(waitNr uint32, timeSpec *syscall.Timespec
 
 	return ring.getCQEAndEnter(getData)
 }
-
-func (ring *Ring) SQSpaceLeft() uint32 {
-	return *ring.sqRing.ringEntries - ring.SQReady()
-}
-
-func (ring *Ring) SQReady() uint32 {
-	head := *ring.sqRing.head
-	if ring.flags&SetupSQPoll > 0 {
-		head = atomic.LoadUint32(ring.sqRing.head)
-	}
-
-	return ring.sqRing.sqeTail - head
-}
-
-//nolint:unused
-func (ring *Ring) sqRingWaitInternal() (uint, error) {
-	flags := EnterSQWait
-	if ring.intFlags&IntFlagRegRing > 0 {
-		flags |= EnterRegisteredRing
-	}
-
-	return ring.enter(0, 0, flags, nil)
-}
-
-//nolint:unused
-func (ring *Ring) sqRingWait() (uint, error) {
-	if ring.flags&SetupSQPoll == 0 {
-		return 0, nil
-	}
-
-	if ring.SQSpaceLeft() > 0 {
-		return 0, nil
-	}
-
-	return ring.sqRingWaitInternal()
-}

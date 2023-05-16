@@ -153,7 +153,7 @@ func TestShardingCloseSeverWithConnectedClients(t *testing.T) {
 }
 
 func TestShardingReleasingUDPConns(t *testing.T) {
-	testHandler := newConnServerTester(10, true)
+	testHandler := newConnServerTester(gainNet.UDP, 10, true)
 	server, port := newTestConnServer(t, gainNet.UDP, false, gain.SocketSharding, testHandler.testServerHandler)
 
 	clientsGroup := newTestConnClientGroup(t, gainNet.UDP, port, 10)

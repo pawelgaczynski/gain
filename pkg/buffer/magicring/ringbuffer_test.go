@@ -260,6 +260,32 @@ func TestMagicRingBufferGrow(t *testing.T) {
 	EqualValues(t, newData, ringBuffer.Bytes())
 }
 
+func TestMagicRingBufferZeroes(t *testing.T) {
+	ringBuffer := NewMagicBuffer(DefaultMagicBufferSize)
+
+	True(t, ringBuffer.IsEmpty(), "expect IsEmpty is true but got false")
+	False(t, ringBuffer.IsFull(), "expect isfull is false but got true")
+	EqualValuesf(t, 0, ringBuffer.Buffered(),
+		"expect len 0 bytes but got %d. r.w=%d, r.r=%d", ringBuffer.Buffered(), ringBuffer.w, ringBuffer.r)
+	EqualValuesf(t, DefaultMagicBufferSize, ringBuffer.Available(),
+		"expect free %d bytes but got %d. r.w=%d, r.r=%d",
+		DefaultMagicBufferSize, ringBuffer.Available(), ringBuffer.w, ringBuffer.r)
+
+	buffer := make([]byte, DefaultMagicBufferSize)
+	n, err := rand.Read(buffer)
+	NoError(t, err)
+	Equal(t, DefaultMagicBufferSize, n)
+	bytesWritten, err := ringBuffer.Write(buffer)
+	NoErrorf(t, err, "expect err is nil but got %v", err)
+	EqualValuesf(t, DefaultMagicBufferSize, bytesWritten,
+		"expect read %d bytes but got %d", DefaultMagicBufferSize, bytesWritten)
+
+	bytes := ringBuffer.Peek(-1)
+	EqualValues(t, buffer, bytes)
+	ringBuffer.Zeroes()
+	EqualValues(t, make([]byte, DefaultMagicBufferSize*2), ringBuffer.vm.Buf)
+}
+
 func TestMagicRingBufferRead(t *testing.T) {
 	ringBuffer := NewMagicBuffer(DefaultMagicBufferSize)
 

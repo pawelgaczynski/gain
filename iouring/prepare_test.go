@@ -79,6 +79,24 @@ func TestPrepareClose(t *testing.T) {
 	Equal(t, int32(0), entry.SpliceFdIn)
 }
 
+func TestPrepareCloseDirect(t *testing.T) {
+	entry := &iouring.SubmissionQueueEntry{}
+	entry.PrepareCloseDirect(10)
+
+	Equal(t, uint8(19), entry.OpCode)
+	Equal(t, uint8(0), entry.Flags)
+	Equal(t, uint16(0), entry.IoPrio)
+	Equal(t, int32(10), entry.Fd)
+	Equal(t, uint64(0), entry.Off)
+	Equal(t, uint64(0), entry.Addr)
+	Equal(t, uint32(0), entry.Len)
+	Equal(t, uint32(0), entry.OpcodeFlags)
+	Equal(t, uint64(0), entry.UserData)
+	Equal(t, uint16(0), entry.BufIG)
+	Equal(t, uint16(0), entry.Personality)
+	Equal(t, int32(0), entry.SpliceFdIn)
+}
+
 func TestPrepareReadv(t *testing.T) {
 	entry := &iouring.SubmissionQueueEntry{}
 	entry.PrepareReadv(10, uintptr(12345), 60, 10)

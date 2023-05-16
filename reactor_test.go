@@ -16,6 +16,7 @@ package gain_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pawelgaczynski/gain"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
@@ -162,6 +163,17 @@ func TestReactorSourceIPHashLoadBalancer(t *testing.T) {
 		numberOfWorkers: 8,
 		configOptions: []gain.ConfigOption{
 			gain.WithLoadBalancing(gain.SourceIPHash),
+		},
+	}, gain.Reactor)
+}
+
+func TestReactorManyWorkersManyClientsTCPKeepAlive(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithTCPKeepAlive(time.Minute),
 		},
 	}, gain.Reactor)
 }

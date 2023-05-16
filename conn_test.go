@@ -122,3 +122,45 @@ func TestConnectionWriteTo(t *testing.T) {
 	NoError(t, err)
 	Equal(t, int64(1024), nBytes)
 }
+
+func TestPeek(t *testing.T) {
+	conn := newConnection()
+	conn.setUserSpace()
+
+	data := make([]byte, 1024)
+	n, err := rand.Read(data)
+	NoError(t, err)
+	Equal(t, 1024, n)
+
+	n, err = conn.inboundBuffer.Write(data)
+	NoError(t, err)
+	Equal(t, 1024, n)
+
+	buffer, err := conn.Peek(-1)
+	NoError(t, err)
+	Equal(t, 1024, len(buffer))
+	Equal(t, data, buffer)
+}
+
+func TestDiscard(t *testing.T) {
+	conn := newConnection()
+	conn.setUserSpace()
+
+	data := make([]byte, 1024)
+	n, err := rand.Read(data)
+	NoError(t, err)
+	Equal(t, 1024, n)
+
+	n, err = conn.inboundBuffer.Write(data)
+	NoError(t, err)
+	Equal(t, 1024, n)
+
+	n, err = conn.Discard(512)
+	NoError(t, err)
+	Equal(t, 512, n)
+
+	buffer, err := conn.Peek(-1)
+	NoError(t, err)
+	Equal(t, 512, len(buffer))
+	Equal(t, data, buffer)
+}

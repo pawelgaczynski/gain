@@ -98,15 +98,15 @@ func getTestPort() int {
 	return int(atomic.AddInt32(&port, 1))
 }
 
-type onStartCallback func(server gain.Server)
+type onStartCallback func(server gain.Server, network string)
 
-type onAcceptCallback func(c gain.Conn)
+type onAcceptCallback func(c gain.Conn, network string)
 
-type onReadCallback func(c gain.Conn, n int)
+type onReadCallback func(c gain.Conn, n int, network string)
 
-type onWriteCallback func(c gain.Conn, n int)
+type onWriteCallback func(c gain.Conn, n int, network string)
 
-type onCloseCallback func(c gain.Conn, err error)
+type onCloseCallback func(c gain.Conn, err error, network string)
 
 func getFdFromConn(c net.Conn) int {
 	v := reflect.Indirect(reflect.ValueOf(c))

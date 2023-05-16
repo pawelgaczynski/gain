@@ -46,7 +46,7 @@ func testHandlerMethod(
 	t.Helper()
 	Equal(t, 4, len(callCounts))
 
-	eventHandlerTester := newEventHandlerTester(callbacks)
+	eventHandlerTester := newEventHandlerTester(callbacks, network)
 	eventHandlerTester.onAcceptWg.Add(callCounts[0])
 	eventHandlerTester.onReadWg.Add(callCounts[1])
 	eventHandlerTester.onWriteWg.Add(callCounts[2])
@@ -180,7 +180,7 @@ func createTestCases(
 
 func TestEventHandlerOnRead(t *testing.T) {
 	callbacks := callbacksHolder{
-		onReadCallback: func(conn gain.Conn, n int) {
+		onReadCallback: func(conn gain.Conn, n int, network string) {
 			buffer, err := conn.Next(n)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
@@ -219,7 +219,7 @@ func TestEventHandlerOnRead(t *testing.T) {
 	testEventHandler(t, testCases)
 
 	callbacks = callbacksHolder{
-		onReadCallback: func(conn gain.Conn, n int) {
+		onReadCallback: func(conn gain.Conn, n int, network string) {
 			buffer, err := conn.Next(n)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
@@ -227,7 +227,7 @@ func TestEventHandlerOnRead(t *testing.T) {
 			Nil(t, err)
 			Equal(t, eventHandlerTestDataSize, bytesWritten)
 		},
-		onWriteCallback: func(conn gain.Conn, n int) {
+		onWriteCallback: func(conn gain.Conn, n int, network string) {
 			buf, err := conn.Next(-1)
 			Equal(t, 0, len(buf))
 			Nil(t, err)
@@ -257,7 +257,7 @@ func TestEventHandlerOnRead(t *testing.T) {
 	testEventHandler(t, testCases)
 
 	callbacks = callbacksHolder{
-		onReadCallback: func(conn gain.Conn, n int) {
+		onReadCallback: func(conn gain.Conn, n int, network string) {
 			buffer, err := conn.Next(-1)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
@@ -267,7 +267,7 @@ func TestEventHandlerOnRead(t *testing.T) {
 			err = conn.Close()
 			Nil(t, err)
 		},
-		onWriteCallback: func(conn gain.Conn, n int) {
+		onWriteCallback: func(conn gain.Conn, n int, network string) {
 			buf, err := conn.Next(-1)
 			Equal(t, 0, len(buf))
 			Equal(t, gainErrors.ErrConnectionClosed, err)
@@ -296,7 +296,7 @@ func TestEventHandlerOnRead(t *testing.T) {
 
 func TestEventHandlerOnAccept(t *testing.T) {
 	callbacks := callbacksHolder{
-		onAcceptCallback: func(conn gain.Conn) {
+		onAcceptCallback: func(conn gain.Conn, network string) {
 			err := conn.SetLinger(0)
 			Nil(t, err)
 			err = conn.Close()
@@ -322,13 +322,13 @@ func TestEventHandlerOnAccept(t *testing.T) {
 	testEventHandler(t, testCases)
 
 	callbacks = callbacksHolder{
-		onAcceptCallback: func(conn gain.Conn) {
+		onAcceptCallback: func(conn gain.Conn, network string) {
 			err := conn.SetLinger(0)
 			Nil(t, err)
 			err = conn.Close()
 			Nil(t, err)
 		},
-		onReadCallback: func(conn gain.Conn, n int) {
+		onReadCallback: func(conn gain.Conn, n int, network string) {
 			buffer, err := conn.Next(n)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
@@ -358,7 +358,7 @@ func TestEventHandlerOnAccept(t *testing.T) {
 	testEventHandler(t, testCases)
 
 	callbacks = callbacksHolder{
-		onAcceptCallback: func(conn gain.Conn) {
+		onAcceptCallback: func(conn gain.Conn, network string) {
 			n, err := conn.Write(eventHandlerTestData)
 			Nil(t, err)
 			Equal(t, eventHandlerTestDataSize, n)
@@ -383,7 +383,7 @@ func TestEventHandlerOnAccept(t *testing.T) {
 	testEventHandler(t, testCases)
 
 	callbacks = callbacksHolder{
-		onAcceptCallback: func(conn gain.Conn) {
+		onAcceptCallback: func(conn gain.Conn, network string) {
 			n, err := conn.Write(eventHandlerTestData)
 			Nil(t, err)
 			Equal(t, eventHandlerTestDataSize, n)
@@ -411,11 +411,11 @@ func TestEventHandlerOnAccept(t *testing.T) {
 
 func TestEventHandlerOnWrite(t *testing.T) {
 	callbacks := callbacksHolder{
-		onAcceptCallback: func(conn gain.Conn) {
+		onAcceptCallback: func(conn gain.Conn, network string) {
 			var once sync.Once
 			conn.SetContext(&once)
 		},
-		onReadCallback: func(conn gain.Conn, n int) {
+		onReadCallback: func(conn gain.Conn, n int, network string) {
 			buffer, err := conn.Next(n)
 			Nil(t, err)
 			Equal(t, eventHandlerTestData, buffer)
@@ -423,7 +423,7 @@ func TestEventHandlerOnWrite(t *testing.T) {
 			Nil(t, err)
 			Equal(t, eventHandlerTestDataSize, bytesWritten)
 		},
-		onWriteCallback: func(conn gain.Conn, n int) {
+		onWriteCallback: func(conn gain.Conn, n int, network string) {
 			time.Sleep(time.Millisecond * 100)
 			once, ok := conn.Context().(*sync.Once)
 			if !ok {
@@ -458,6 +458,64 @@ func TestEventHandlerOnWrite(t *testing.T) {
 		{1, 1, 2, 1},
 		{1, 1, 2, 1},
 		{1, 1, 2, 1},
+	})
+
+	testEventHandler(t, testCases)
+}
+
+func TestEventHandlerSetConnectionProperties(t *testing.T) {
+	setConnectionProperties := func(conn gain.Conn, network string) {
+		err := conn.SetLinger(30)
+		NoError(t, err)
+		err = conn.SetReadBuffer(2048)
+		NoError(t, err)
+		err = conn.SetWriteBuffer(2048)
+		NoError(t, err)
+
+		if network == gainNet.TCP {
+			err = conn.SetKeepAlivePeriod(time.Minute)
+			NoError(t, err)
+			err = conn.SetNoDelay(true)
+			NoError(t, err)
+		}
+	}
+	callbacks := callbacksHolder{
+		onAcceptCallback: func(conn gain.Conn, network string) {
+			setConnectionProperties(conn, network)
+		},
+		onReadCallback: func(conn gain.Conn, n int, network string) {
+			setConnectionProperties(conn, network)
+			buffer, err := conn.Next(n)
+			Nil(t, err)
+			Equal(t, eventHandlerTestData, buffer)
+			bytesWritten, err := conn.Write(buffer)
+			Nil(t, err)
+			Equal(t, eventHandlerTestDataSize, bytesWritten)
+		},
+		onWriteCallback: func(conn gain.Conn, n int, network string) {
+			setConnectionProperties(conn, network)
+			conn.Close()
+		},
+	}
+	clientBehavior := func(conn net.Conn) {
+		n, err := conn.Write(eventHandlerTestData)
+		Equal(t, eventHandlerTestDataSize, n)
+		Nil(t, err)
+
+		buffer := make([]byte, eventHandlerTestDataSize*2)
+		n, err = conn.Read(buffer)
+		Equal(t, eventHandlerTestDataSize, n)
+		Nil(t, err)
+		Equal(t, eventHandlerTestData, buffer[:eventHandlerTestDataSize])
+	}
+
+	testCases := createTestCases("All", both, callbacks, clientBehavior, [][]int{
+		{1, 1, 1, 1},
+		{1, 1, 1, 1},
+		{1, 1, 1, 1},
+		{1, 1, 1, 1},
+		{0, 1, 1, 0},
+		{0, 1, 1, 0},
 	})
 
 	testEventHandler(t, testCases)

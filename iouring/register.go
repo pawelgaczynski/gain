@@ -114,18 +114,6 @@ func (ring *Ring) RegisterProbe() (*Probe, error) {
 	return probe, err
 }
 
-func (ring *Ring) RegisterBuffers(iovecs []syscall.Iovec) (uintptr, uintptr, error) {
-	return ring.Register(RegisterBuffers, unsafe.Pointer(&iovecs[0]), len(iovecs))
-}
-
-func (ring *Ring) UnregisterBuffers() (uintptr, uintptr, error) {
-	return ring.Register(UnregisterBuffers, unsafe.Pointer(nil), 0)
-}
-
-func (ring *Ring) RegisterIOWQMaxWorkers(args []uint) (uintptr, uintptr, error) {
-	return ring.Register(RegisterIOWQMaxWorkers, unsafe.Pointer(&args[0]), regIOWQMaxWorkersNrArgs)
-}
-
 func (ring *Ring) Register(op uint, arg unsafe.Pointer, nrArgs int) (uintptr, uintptr, error) {
 	returnFirst, returnSecond, errno := syscall.Syscall6(
 		sysRegister,
