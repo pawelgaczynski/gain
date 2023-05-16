@@ -104,13 +104,17 @@ func (e *engine) startConsumers(startedWg, doneWg *sync.WaitGroup) {
 	})
 }
 
-func (e *engine) handleWorkerStop(index int, numberOfWorkers *int32, err error, startedWg *sync.WaitGroup, worker readWriteWorkerImpl) {
+func (e *engine) handleWorkerStop(
+	index int, numberOfWorkers *int32, err error, startedWg *sync.WaitGroup, worker readWriteWorkerImpl,
+) {
 	atomic.AddInt32(numberOfWorkers, -1)
 	livingWorkers := atomic.LoadInt32(numberOfWorkers)
 	e.logger.Error().Err(err).Int32("living workers", livingWorkers).Int("worker index", index).Msg("Worker died...")
+
 	if !worker.started() {
 		startedWg.Done()
 	}
+
 	e.readWriteWorkers.Delete(index)
 }
 
