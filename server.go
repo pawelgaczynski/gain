@@ -94,13 +94,7 @@ func (e *engine) startConsumers(startedWg, doneWg *sync.WaitGroup) {
 		go func(cWorker *consumerWorker) {
 			err := cWorker.loop(0)
 			if err != nil {
-				atomic.AddInt32(&numberOfWorkers, -1)
-				livingWorkers := atomic.LoadInt32(&numberOfWorkers)
-				e.logger.Error().Err(err).Int32("living workers", livingWorkers).Int("worker index", index).Msg("Worker died...")
-				if !cWorker.started() {
-					startedWg.Done()
-				}
-				e.readWriteWorkers.Delete(index)
+				e.handleWorkerStop(index, &numberOfWorkers, err, startedWg, *cWorker.readWriteWorkerImpl)
 			}
 			doneWg.Done()
 		}(worker)
@@ -108,6 +102,16 @@ func (e *engine) startConsumers(startedWg, doneWg *sync.WaitGroup) {
 
 		return true
 	})
+}
+
+func (e *engine) handleWorkerStop(index int, numberOfWorkers *int32, err error, startedWg *sync.WaitGroup, worker readWriteWorkerImpl) {
+	atomic.AddInt32(numberOfWorkers, -1)
+	livingWorkers := atomic.LoadInt32(numberOfWorkers)
+	e.logger.Error().Err(err).Int32("living workers", livingWorkers).Int("worker index", index).Msg("Worker died...")
+	if !worker.started() {
+		startedWg.Done()
+	}
+	e.readWriteWorkers.Delete(index)
 }
 
 func (e *engine) startReactor(listener *listener, features supportedFeatures) error {
@@ -248,13 +252,7 @@ func (e *engine) startSocketSharding(listeners []*listener, protocol string) err
 		go func(sWorker *shardWorker) {
 			err := sWorker.loop(listeners[index].fd)
 			if err != nil {
-				atomic.AddInt32(&numberOfWorkers, -1)
-				livingWorkers := atomic.LoadInt32(&numberOfWorkers)
-				e.logger.Error().Err(err).Int32("living workers", livingWorkers).Int("worker index", index).Msg("Worker died...")
-				if !sWorker.started() {
-					startedWg.Done()
-				}
-				e.readWriteWorkers.Delete(index)
+				e.handleWorkerStop(index, &numberOfWorkers, err, &startedWg, *sWorker.readWriteWorkerImpl)
 			}
 			doneWg.Done()
 		}(worker)
