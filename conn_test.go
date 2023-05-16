@@ -123,7 +123,7 @@ func TestConnectionWriteTo(t *testing.T) {
 	Equal(t, int64(1024), nBytes)
 }
 
-func TestPeek(t *testing.T) {
+func TestConnectionPeek(t *testing.T) {
 	conn := newConnection()
 	conn.setUserSpace()
 
@@ -142,7 +142,7 @@ func TestPeek(t *testing.T) {
 	Equal(t, data, buffer)
 }
 
-func TestDiscard(t *testing.T) {
+func TestConnectionDiscard(t *testing.T) {
 	conn := newConnection()
 	conn.setUserSpace()
 
@@ -162,5 +162,5 @@ func TestDiscard(t *testing.T) {
 	buffer, err := conn.Peek(-1)
 	NoError(t, err)
 	Equal(t, 512, len(buffer))
-	Equal(t, data, buffer)
+	Equal(t, data[512:], buffer)
 }

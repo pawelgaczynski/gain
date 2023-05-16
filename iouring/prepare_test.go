@@ -86,7 +86,7 @@ func TestPrepareCloseDirect(t *testing.T) {
 	Equal(t, uint8(19), entry.OpCode)
 	Equal(t, uint8(0), entry.Flags)
 	Equal(t, uint16(0), entry.IoPrio)
-	Equal(t, int32(10), entry.Fd)
+	Equal(t, int32(0), entry.Fd)
 	Equal(t, uint64(0), entry.Off)
 	Equal(t, uint64(0), entry.Addr)
 	Equal(t, uint32(0), entry.Len)
@@ -94,7 +94,7 @@ func TestPrepareCloseDirect(t *testing.T) {
 	Equal(t, uint64(0), entry.UserData)
 	Equal(t, uint16(0), entry.BufIG)
 	Equal(t, uint16(0), entry.Personality)
-	Equal(t, int32(0), entry.SpliceFdIn)
+	Equal(t, int32(11), entry.SpliceFdIn)
 }
 
 func TestPrepareReadv(t *testing.T) {
