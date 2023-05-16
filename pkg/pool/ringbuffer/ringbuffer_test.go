@@ -91,3 +91,37 @@ func TestRingBufferPool(t *testing.T) {
 	Equal(t, ringBuffer, ringBufferFromPool)
 	runtime.KeepAlive(ringBuffer)
 }
+
+func TestRingBufferPoolCalibrate(t *testing.T) {
+	pool := NewRingBufferPool()
+
+	Equal(t, uint64(magicring.DefaultMagicBufferSize), pool.defaultSize)
+	// Equal(t, uint64(magicring.DefaultMagicBufferSize), pool.maxSize)
+
+	pool.calibrating = 0
+
+	pool.calibrate()
+
+	Equal(t, uint64(magicring.DefaultMagicBufferSize), pool.defaultSize)
+	Equal(t, uint64(67108864), pool.maxSize)
+
+	pool.calls[4] = 3278
+	pool.calls[9] = 12312
+	pool.calls[13] = 1000
+
+	pool.calibrate()
+
+	Equal(t, uint64(2097152), pool.defaultSize)
+	Equal(t, uint64(33554432), pool.maxSize)
+
+	pool.calibrating = 1
+
+	pool.calls[4] = 32780
+	pool.calls[9] = 12312
+	pool.calls[13] = 21000
+
+	pool.calibrate()
+
+	Equal(t, uint64(2097152), pool.defaultSize)
+	Equal(t, uint64(33554432), pool.maxSize)
+}
