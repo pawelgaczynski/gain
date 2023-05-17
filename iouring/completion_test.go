@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -57,7 +56,7 @@ func TestPeekBatchCQE(t *testing.T) {
 	Equal(t, 4, cnt)
 
 	for i := 0; i < 4; i++ {
-		assert.Equal(t, uint64(i), cqeBuff[i].UserData())
+		Equal(t, uint64(i), cqeBuff[i].UserData())
 	}
 
 	NoError(t, queueNOPs(t, ring, 4, 4))
@@ -90,4 +89,37 @@ func TestCQEFlagsString(t *testing.T) {
 
 	cqe.flags = CQEFBuffer | CQEFMore | CQEFSockNonempty | CQEFNotif
 	Equal(t, "CQEFBuffer | CQEFMore | CQEFSockNonempty | CQEFNotif", cqe.FlagsString())
+}
+
+func TestCQEGetters(t *testing.T) {
+	var cqe CompletionQueueEvent
+	cqe.flags = 123
+	cqe.res = 45
+	cqe.userData = 6789
+
+	Equal(t, uint32(123), cqe.Flags())
+	Equal(t, int32(45), cqe.Res())
+	Equal(t, uint64(6789), cqe.UserData())
+}
+
+func TestRingCqRingNeedsEnter(t *testing.T) {
+	var ring Ring
+	ring.sqRing = &SubmissionQueue{}
+
+	var flags uint32
+	ring.sqRing.flags = &flags
+
+	False(t, ring.cqRingNeedsEnter())
+
+	ring.flags |= SetupIOPoll
+
+	True(t, ring.cqRingNeedsEnter())
+
+	ring.flags = 0
+
+	False(t, ring.cqRingNeedsEnter())
+
+	flags |= SQCQOverflow
+
+	True(t, ring.cqRingNeedsEnter())
 }

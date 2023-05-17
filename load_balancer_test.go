@@ -18,6 +18,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/pawelgaczynski/gain/pkg/errors"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -216,4 +217,22 @@ func TestSourceIPHashLoadBalancer(t *testing.T) {
 	err = worker.loop(0)
 	Nil(t, err)
 	Same(t, worker, workers[2])
+}
+
+func TestCreateLoadBalancer(t *testing.T) {
+	lb, err := createLoadBalancer(RoundRobin)
+	NoError(t, err)
+	IsType(t, &roundRobinLoadBalancer{}, lb)
+
+	lb, err = createLoadBalancer(LeastConnections)
+	NoError(t, err)
+	IsType(t, &leastConnectionsLoadBalancer{}, lb)
+
+	lb, err = createLoadBalancer(SourceIPHash)
+	NoError(t, err)
+	IsType(t, &sourceIPHashLoadBalancer{}, lb)
+
+	lb, err = createLoadBalancer(10)
+	ErrorIs(t, errors.ErrNotSupported, err)
+	Nil(t, lb)
 }

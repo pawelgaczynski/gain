@@ -177,10 +177,6 @@ func (ring *Ring) SubmitAndWaitInternal(waitNr uint64) (uint, error) {
 	return ring.SubmitInternal(ring.FlushSQ(), waitNr)
 }
 
-func (ring *Ring) SubmitAndWait(waitNr uint64) (uint, error) {
-	return ring.SubmitAndWaitInternal(waitNr)
-}
-
 func (ring *Ring) Submit() (uint, error) {
 	return ring.SubmitAndWaitInternal(0)
 }

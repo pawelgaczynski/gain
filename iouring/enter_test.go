@@ -12,49 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package virtualmem
+package iouring
 
 import (
-	"fmt"
 	"os"
-	"runtime"
+	"syscall"
 	"testing"
 
 	. "github.com/stretchr/testify/require"
 )
 
-func TestVirtualMemPool(t *testing.T) {
-	pool := NewPool()
-
-	size := os.Getpagesize()
-	vm := NewVirtualMem(size)
-
-	pool.Put(vm)
-
-	vmFromPool := pool.Get(size)
-
-	Same(t, vm, vmFromPool)
-	runtime.KeepAlive(vm)
-
-	vm = Get(size)
-
-	Put(vm)
-
-	vmFromPool = Get(size)
-
-	Same(t, vm, vmFromPool)
-	runtime.KeepAlive(vm)
-
-	Nil(t, pool.Get(0))
-	Nil(t, pool.Get(-1))
-
-	vm = NewVirtualMem(maxVMSize + pageSize)
-
-	pool.Put(vm)
-
-	vmFromPool = pool.Get(maxVMSize + pageSize)
-
-	NotEqual(t, fmt.Sprintf("%p\n", vmFromPool), fmt.Sprintf("%p\n", vm))
-
-	runtime.KeepAlive(vm)
+func TestConvertErrno(t *testing.T) {
+	EqualValues(t, ErrTimerExpired, convertErrno(syscall.ETIME))
+	EqualValues(t, ErrInterrupredSyscall, convertErrno(syscall.EINTR))
+	EqualValues(t, ErrAgain, convertErrno(syscall.EAGAIN))
+	EqualValues(t, os.NewSyscallError("io_uring_enter", syscall.EINVAL), convertErrno(syscall.EINVAL))
+	EqualValues(t, os.NewSyscallError("io_uring_enter", syscall.EBADF), convertErrno(syscall.EBADF))
+	EqualValues(t, os.NewSyscallError("io_uring_enter", syscall.EBUSY), convertErrno(syscall.EBUSY))
 }

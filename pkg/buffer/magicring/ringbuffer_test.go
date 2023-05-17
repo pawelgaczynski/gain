@@ -488,6 +488,16 @@ func TestMagicRingBufferByteInterface(t *testing.T) {
 	EqualValues(t, 1, result)
 
 	Nil(t, ringBuffer.Bytes())
+
+	bytesWritten, err = ringBuffer.Write([]byte(strings.Repeat("a", DefaultMagicBufferSize*2)))
+	NoError(t, err)
+	EqualValues(t, DefaultMagicBufferSize*2, bytesWritten)
+
+	for i := 0; i < DefaultMagicBufferSize*2; i++ {
+		byteR, rbErr := ringBuffer.ReadByte()
+		NoError(t, rbErr)
+		EqualValues(t, "a", string(byteR))
+	}
 }
 
 func TestMagicRingBufferReadFrom(t *testing.T) {
