@@ -124,12 +124,6 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 
 func (c *consumerWorker) handleNewConn(fd int) error {
 	conn := c.connectionManager.getFd(fd)
-	if conn == nil {
-		c.logError(gainErrors.ErrorConnectionIsMissing(fd)).Msg("Get new connection error")
-		_ = c.syscallCloseSocket(fd)
-
-		return nil
-	}
 	conn.fd = fd
 	conn.localAddr = c.localAddr
 
@@ -215,12 +209,6 @@ func (c *consumerWorker) loop(_ int) error {
 			return nil
 		}
 		conn := c.connectionManager.getFd(fileDescriptor)
-		if conn == nil {
-			c.logError(gainErrors.ErrorConnectionIsMissing(fileDescriptor)).Msg("Get connection error")
-			_ = c.syscallCloseSocket(fileDescriptor)
-
-			return nil
-		}
 		c.handleConn(conn, cqe)
 
 		return nil

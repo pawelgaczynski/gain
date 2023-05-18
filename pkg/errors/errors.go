@@ -39,9 +39,6 @@ var (
 	ErrConnectionAlreadyClosed = errors.New("connection already closed")
 	// ErrConnectionAlreadyClosed when trying to work with closed connection.
 	ErrConnectionClosed = errors.New("connection closed")
-	// ErrConnectionIsMissing occurs when trying to access connection that is missing.
-	// For TCP connections key is the file descriptor.
-	ErrConnectionIsMissing = errors.New("connection is missing")
 	// ErrOpNotAvailableInMode occurs when trying to run operation that is not available in current mode.
 	ErrOpNotAvailableInMode = errors.New("op is not available in mode")
 	// ErrConnectionQueueIsNil occurs when trying to access connection queue that is not initialized.
@@ -57,10 +54,6 @@ var (
 	// ErrServerAlreadyRunning occurs when trying to start already running server.
 	ErrServerAlreadyRunning = errors.New("server already running")
 )
-
-func ErrorConnectionIsMissing(key int) error {
-	return fmt.Errorf("%w, key: %d", ErrConnectionIsMissing, key)
-}
 
 func ErrorOpNotAvailableInMode(op, mode string) error {
 	return fmt.Errorf("%w, op: %s, mode: %s", ErrOpNotAvailableInMode, op, mode)

@@ -21,7 +21,6 @@ import (
 	"unsafe"
 
 	"github.com/pawelgaczynski/gain/iouring"
-	"github.com/pawelgaczynski/gain/pkg/errors"
 	"github.com/pawelgaczynski/gain/pkg/socket"
 )
 
@@ -53,9 +52,6 @@ func (a *acceptor) addAcceptConnRequest() error {
 	}
 
 	conn := a.connectionManager.getFd(a.fd)
-	if conn == nil {
-		return errors.ErrConnectionIsMissing
-	}
 	conn.state = connAccept
 
 	return nil
