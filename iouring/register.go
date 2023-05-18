@@ -15,9 +15,7 @@
 package iouring
 
 import (
-	"errors"
 	"os"
-	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -114,132 +112,6 @@ func (ring *Ring) RegisterProbe() (*Probe, error) {
 	_, _, err := ring.Register(RegisterProbe, unsafe.Pointer(probe), probeOpsSize)
 
 	return probe, err
-}
-
-func (ring *Ring) RegisterBuffers(iovecs []syscall.Iovec) (uintptr, uintptr, error) {
-	return ring.Register(RegisterBuffers, unsafe.Pointer(&iovecs[0]), len(iovecs))
-}
-
-func (ring *Ring) UnregisterBuffers() (uintptr, uintptr, error) {
-	return ring.Register(UnregisterBuffers, unsafe.Pointer(nil), 0)
-}
-
-func (ring *Ring) RegisterIOWQMaxWorkers(args []uint) (uintptr, uintptr, error) {
-	return ring.Register(RegisterIOWQMaxWorkers, unsafe.Pointer(&args[0]), regIOWQMaxWorkersNrArgs)
-}
-
-func increaseRlimitNofile(nrFiles uint64) error {
-	rlim := &syscall.Rlimit{}
-
-	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, rlim)
-	if err != nil {
-		return os.NewSyscallError("getrlimit", err)
-	}
-
-	if rlim.Cur < nrFiles {
-		rlim.Cur += nrFiles
-		_ = syscall.Setrlimit(syscall.RLIMIT_NOFILE, rlim)
-	}
-
-	return nil
-}
-
-func (ring *Ring) RegisterFiles(files unsafe.Pointer, nrFiles int) (uintptr, error) {
-	var (
-		ret         uintptr
-		err         error
-		didIncrease bool
-	)
-
-	for {
-		ret, _, err = ring.Register(RegisterFiles, files, nrFiles)
-		if err == nil {
-			break
-		}
-
-		if errors.Is(err, syscall.EMFILE) && !didIncrease {
-			didIncrease = true
-			_ = increaseRlimitNofile(uint64(nrFiles))
-
-			continue
-		}
-
-		break
-	}
-
-	return ret, err
-}
-
-func (ring *Ring) RegisterFilesSparse(nrFiles uint32) (uintptr, error) {
-	ring.flags = RsrcRegisterSparse
-	reg := &RsrcRegister{
-		Nr: nrFiles,
-	}
-
-	var (
-		ret         uintptr
-		err         error
-		didIncrease bool
-	)
-
-	for {
-		regSize := int(unsafe.Sizeof(RsrcRegister{}))
-
-		ret, _, err = ring.Register(RegisterFiles2, unsafe.Pointer(reg), regSize)
-		if err == nil {
-			break
-		}
-
-		if errors.Is(err, syscall.EMFILE) && !didIncrease {
-			didIncrease = true
-			_ = increaseRlimitNofile(uint64(nrFiles))
-
-			continue
-		}
-
-		break
-	}
-
-	runtime.KeepAlive(reg)
-
-	return ret, err
-}
-
-func (ring *Ring) RegisterRingFd() (uintptr, error) {
-	rsrcUpdate := &RsrcUpdate{
-		Data:   uint64(ring.fd),
-		Offset: registerRingFdOffset,
-	}
-
-	ret, _, err := ring.Register(RegisterRingFDs, unsafe.Pointer(rsrcUpdate), 1)
-	if err != nil {
-		return ret, err
-	}
-
-	if ret == 1 {
-		ring.enterRingFd = int(rsrcUpdate.Offset)
-		ring.intFlags |= IntFlagRegRing
-	}
-
-	return ret, nil
-}
-
-func (ring *Ring) UnregisterRingFd() (uintptr, error) {
-	rsrcUpdate := &RsrcUpdate{
-		Offset: uint32(ring.fd),
-	}
-
-	ret, _, err := ring.Register(UnregisterRingFDs, unsafe.Pointer(rsrcUpdate), 1)
-	if err != nil {
-		return ret, err
-	}
-
-	if ret == 1 {
-		ring.enterRingFd = int(rsrcUpdate.Offset)
-		ring.intFlags &= ^IntFlagRegRing
-	}
-
-	return ret, nil
 }
 
 func (ring *Ring) Register(op uint, arg unsafe.Pointer, nrArgs int) (uintptr, uintptr, error) {

@@ -15,18 +15,11 @@
 package iouring
 
 import (
-	"errors"
-	"fmt"
+	"testing"
+
+	. "github.com/stretchr/testify/require"
 )
 
-var (
-	ErrNotSupported       = errors.New("not supported")
-	ErrTimerExpired       = errors.New("timer expired")
-	ErrInterrupredSyscall = errors.New("interrupred system call")
-	ErrAgain              = errors.New("try again")
-	ErrSQEOverflow        = errors.New("SQE overflow")
-)
-
-func ErrorSQEOverflow(overflowValue uint32) error {
-	return fmt.Errorf("%w: %d", ErrSQEOverflow, overflowValue)
+func TestErrorSQEOverflow(t *testing.T) {
+	EqualValues(t, "SQE overflow: 12", ErrorSQEOverflow(12).Error())
 }

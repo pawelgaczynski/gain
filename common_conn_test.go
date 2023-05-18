@@ -43,12 +43,12 @@ func (t *connServerTester) waitForWrites() {
 	t.writeWG.Wait()
 }
 
-func (t *connServerTester) onReadCallback(conn gain.Conn, n int) {
+func (t *connServerTester) onReadCallback(conn gain.Conn, n int, _ string) {
 	buf, _ := conn.Next(n)
 	_, _ = conn.Write(buf)
 }
 
-func (t *connServerTester) onWriteCallback(_ gain.Conn, _ int) {
+func (t *connServerTester) onWriteCallback(_ gain.Conn, _ int, _ string) {
 	if t.writeWG != nil {
 		t.mutex.Lock()
 
@@ -64,7 +64,7 @@ func (t *connServerTester) onWriteCallback(_ gain.Conn, _ int) {
 	}
 }
 
-func newConnServerTester(writeCount int, removeWGAfterMinWrites bool) *connServerTester {
+func newConnServerTester(network string, writeCount int, removeWGAfterMinWrites bool) *connServerTester {
 	connServerTester := &connServerTester{}
 
 	if writeCount > 0 {
@@ -76,7 +76,7 @@ func newConnServerTester(writeCount int, removeWGAfterMinWrites bool) *connServe
 		connServerTester.removeWGAfterMinWrites = removeWGAfterMinWrites
 	}
 
-	testConnHandler := newTestServerHandler(connServerTester.onReadCallback)
+	testConnHandler := newTestServerHandler(connServerTester.onReadCallback, network)
 
 	testConnHandler.onWriteCallback = connServerTester.onWriteCallback
 	connServerTester.testServerHandler = testConnHandler
@@ -84,8 +84,10 @@ func newConnServerTester(writeCount int, removeWGAfterMinWrites bool) *connServe
 	return connServerTester
 }
 
-func newEventHandlerTester(callbacks callbacksHolder) *testServerHandler {
-	testHandler := &testServerHandler{}
+func newEventHandlerTester(callbacks callbacksHolder, network string) *testServerHandler {
+	testHandler := &testServerHandler{
+		network: network,
+	}
 
 	var (
 		startedWg  sync.WaitGroup
@@ -289,7 +291,7 @@ func testConnAddress(
 
 	wg.Add(numberOfClients)
 
-	onReadCallback := func(conn gain.Conn, n int) {
+	onReadCallback := func(conn gain.Conn, n int, _ string) {
 		buf, _ := conn.Next(n)
 		_, _ = conn.Write(buf)
 
@@ -298,7 +300,7 @@ func testConnAddress(
 		wg.Done()
 	}
 
-	testHandler := newTestServerHandler(onReadCallback)
+	testHandler := newTestServerHandler(onReadCallback, network)
 
 	server := gain.NewServer(testHandler, config)
 	testPort := getTestPort()

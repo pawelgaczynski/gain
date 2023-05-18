@@ -72,9 +72,7 @@ func (c *consumerWorker) closeAllConns() {
 }
 
 func (c *consumerWorker) activeConnections() int {
-	return c.connectionManager.activeConnections(func(c *connection) bool {
-		return true
-	})
+	return c.connectionManager.activeConnections()
 }
 
 func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueEvent) {
@@ -124,6 +122,25 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 	}
 }
 
+func (c *consumerWorker) handleNewConn(fd int) error {
+	conn := c.connectionManager.getFd(fd)
+	conn.fd = fd
+	conn.localAddr = c.localAddr
+
+	if remoteAddr, ok := c.socketAddresses.Load(fd); ok {
+		conn.remoteAddr, _ = remoteAddr.(net.Addr)
+
+		c.socketAddresses.Delete(fd)
+	} else {
+		c.logError(gainErrors.ErrorAddressNotFound(fd)).Msg("Get connection address error")
+	}
+
+	conn.setUserSpace()
+	c.eventHandler.OnAccept(conn)
+
+	return c.addNextRequest(conn)
+}
+
 func (c *consumerWorker) getConnsFromQueue() {
 	for {
 		if c.connQueue.IsEmpty() {
@@ -131,27 +148,7 @@ func (c *consumerWorker) getConnsFromQueue() {
 		}
 		fd := c.connQueue.Dequeue()
 
-		conn := c.connectionManager.getFd(fd)
-		if conn == nil {
-			c.logError(gainErrors.ErrorConnectionIsMissing(fd)).Msg("Get new connection error")
-
-			continue
-		}
-		conn.fd = fd
-		conn.localAddr = c.localAddr
-
-		if remoteAddr, ok := c.socketAddresses.Load(fd); ok {
-			conn.remoteAddr, _ = remoteAddr.(net.Addr)
-
-			c.socketAddresses.Delete(fd)
-		} else {
-			c.logError(gainErrors.ErrorAddressNotFound(fd)).Msg("Get new connection error")
-		}
-
-		conn.setUserSpace()
-		c.eventHandler.OnAccept(conn)
-
-		err := c.addNextRequest(conn)
+		err := c.handleNewConn(fd)
 		if err != nil {
 			c.logError(err).Msg("add request error")
 		}
@@ -201,27 +198,9 @@ func (c *consumerWorker) loop(_ int) error {
 			return nil
 		}
 		if cqe.UserData()&addConnFlag > 0 {
-			fileDescriptor := int(cqe.Res())
-			conn := c.connectionManager.getFd(fileDescriptor)
-			if conn == nil {
-				c.logError(gainErrors.ErrorConnectionIsMissing(fileDescriptor)).Msg("Get new connection error")
-				_ = c.syscallCloseSocket(fileDescriptor)
+			fd := int(cqe.Res())
 
-				return nil
-			}
-			conn.fd = int(cqe.Res())
-			conn.localAddr = c.localAddr
-			if remoteAddr, ok := c.socketAddresses.Load(conn.fd); ok {
-				conn.remoteAddr, _ = remoteAddr.(net.Addr)
-				c.socketAddresses.Delete(conn.fd)
-			} else {
-				c.logError(gainErrors.ErrorAddressNotFound(conn.fd)).Msg("Get new connection error")
-			}
-
-			conn.setUserSpace()
-			c.eventHandler.OnAccept(conn)
-
-			return c.addNextRequest(conn)
+			return c.handleNewConn(fd)
 		}
 		fileDescriptor := int(cqe.UserData() & ^allFlagsMask)
 		if fileDescriptor < syscall.Stderr {
@@ -230,12 +209,6 @@ func (c *consumerWorker) loop(_ int) error {
 			return nil
 		}
 		conn := c.connectionManager.getFd(fileDescriptor)
-		if conn == nil {
-			c.logError(gainErrors.ErrorConnectionIsMissing(fileDescriptor)).Msg("Get connection error")
-			_ = c.syscallCloseSocket(fileDescriptor)
-
-			return nil
-		}
 		c.handleConn(conn, cqe)
 
 		return nil

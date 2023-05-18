@@ -15,7 +15,6 @@
 package iouring
 
 import (
-	"log"
 	"syscall"
 	"time"
 	"unsafe"
@@ -39,18 +38,6 @@ func (entry *SubmissionQueueEntry) prepareRW(opcode uint8, fd int, addr uintptr,
 	entry.SpliceFdIn = 0
 	entry._pad2[0] = 0
 	entry._pad2[1] = 0
-}
-
-// PrepareSplice has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSplice(
-	_ int, _ int64, _ int, _ int64, _ uint, _ uint,
-) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareTee has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareTee(_ int, _ int, _ uint, _ uint) {
-	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareReadv(fd int, iovecs uintptr, nrVecs uint32, offset uint64) {
@@ -113,31 +100,6 @@ func (entry *SubmissionQueueEntry) PrepareSendMsg(
 	entry.OpcodeFlags = flags
 }
 
-// PreparePollAdd has not been implemented yet.
-func (entry *SubmissionQueueEntry) PreparePollAdd(_ int, _ uint) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PreparePollMultishot has not been implemented yet.
-func (entry *SubmissionQueueEntry) PreparePollMultishot(_ int, _ uint) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PreparePollRemove has not been implemented yet.
-func (entry *SubmissionQueueEntry) PreparePollRemove(_ int, _ uint64) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PreparePollUpdate has not been implemented yet.
-func (entry *SubmissionQueueEntry) PreparePollUpdate(_ int, _, _ uint64, _, _ uint) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareFsync has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareFsync(_ int, _ uint) {
-	log.Panic(ErrNotImplemented)
-}
-
 func (entry *SubmissionQueueEntry) PrepareNop() {
 	entry.prepareRW(OpNop, -1, 0, 0, 0)
 }
@@ -172,41 +134,6 @@ func (entry *SubmissionQueueEntry) PrepareAcceptDirect(
 	entry.setTargetFixedFile(fileIndex)
 }
 
-// PrepareCancel has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareCancel(_ uint64, _ int) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareLinkTimeout has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareLinkTimeout(_ *syscall.Timespec, _ uint) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareConnect has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareConnect(_ int, _ uintptr, _ uint64) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareConnectFilesUpdate has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareConnectFilesUpdate(_ []int, _ uint64, _ uint) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareFallocate has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareFallocate(_ int, _ int, _ uint64, _ uint64) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareOpenat has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareOpenat(_ int, _ string, _ int, _ uint32) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareOpenatDirect has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareOpenatDirect(_ int, _ string, _ int, _ uint32, _ uint) {
-	log.Panic(ErrNotImplemented)
-}
-
 func (entry *SubmissionQueueEntry) PrepareClose(fd int) {
 	entry.prepareRW(OpClose, fd, 0, 0, 0)
 }
@@ -214,56 +141,6 @@ func (entry *SubmissionQueueEntry) PrepareClose(fd int) {
 func (entry *SubmissionQueueEntry) PrepareCloseDirect(fileIndex uint) {
 	entry.PrepareClose(0)
 	entry.setTargetFixedFile(fileIndex)
-}
-
-// PrepareRead has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareRead(
-	_ int,
-	_ uintptr,
-	_ uint32,
-	_ uint64,
-) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareWrite has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareWrite(
-	_ int,
-	_ uintptr,
-	_ uint32,
-	_ uint64,
-) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareStatx has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareStatx(
-	_ int,
-	_ string,
-	_ int,
-	_ uint,
-	_ uintptr,
-) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareFadvise has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareFadvise(
-	_ int,
-	_ uint64,
-	_ uint32,
-	_ int,
-) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareMadvise has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareMadvise(
-	_ uintptr,
-	_ uint32,
-	_ int,
-) {
-	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareSend(
@@ -274,25 +151,6 @@ func (entry *SubmissionQueueEntry) PrepareSend(
 ) {
 	entry.prepareRW(OpSend, fileDescriptor, addr, length, 0)
 	entry.OpcodeFlags = flags
-}
-
-// PrepareSendZC has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSendZC(
-	_ int,
-	_ uintptr,
-	_ uint32,
-	_ uint32,
-	_ uint,
-) {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSendSetAddr has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSendSetAddr(
-	_ uintptr,
-	_ uint16,
-) {
-	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareRecv(
@@ -324,21 +182,6 @@ func (entry *SubmissionQueueEntry) PrepareRecvMultishot(
 	entry.IoPrio |= RecvMultishot
 }
 
-// PrepareOpenat2 has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareOpenat2() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareOpenat2Direct has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareOpenat2Direct() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareEpollCtrl has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareEpollCtrl() {
-	log.Panic(ErrNotImplemented)
-}
-
 func (entry *SubmissionQueueEntry) PrepareProvideBuffers(
 	addr uintptr,
 	length uint32,
@@ -362,109 +205,9 @@ func (entry *SubmissionQueueEntry) PrepareProvideBuffers(
 	entry._pad2[1] = 0
 }
 
-// PrepareRemoveBuffers has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareRemoveBuffers() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareShutdown has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareShutdown() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareUnlinkat has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareUnlinkat() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareUnlink has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareUnlink() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareRenameat has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareRenameat() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareRename has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareRename() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSyncFileRange has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSyncFileRange() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareMkdirat has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareMkdirat() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareMkdir has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareMkdir() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSymlinkat has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSymlinkat() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSymlink has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSymlink() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareLinkat has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareLinkat() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareLink has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareLink() {
-	log.Panic(ErrNotImplemented)
-}
-
 func (entry *SubmissionQueueEntry) PrepareMsgRing(fd int, length uint32, data uint64, flags uint32) {
 	entry.prepareRW(OpMsgRing, fd, 0, length, data)
 	entry.OpcodeFlags = flags
-}
-
-// PrepareGetxattr has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareGetxattr() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSetxattr has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSetxattr() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareFgetxattr has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareFgetxattr() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareFsetxattr has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareFsetxattr() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSocket has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSocket() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSocketDirect has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSocketDirect() {
-	log.Panic(ErrNotImplemented)
-}
-
-// PrepareSocketDirectAlloc has not been implemented yet.
-func (entry *SubmissionQueueEntry) PrepareSocketDirectAlloc() {
-	log.Panic(ErrNotImplemented)
 }
 
 func (entry *SubmissionQueueEntry) PrepareTimeout2(ts *syscall.Timespec, count uint64, flags uint32) {

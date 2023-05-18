@@ -15,8 +15,11 @@
 package ringbuffer
 
 import (
+	"os"
+	"runtime"
 	"testing"
 
+	"github.com/pawelgaczynski/gain/pkg/buffer/magicring"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -65,4 +68,60 @@ func TestIndexRingBufferPool(t *testing.T) {
 	Equal(t, 14, idx)
 	idx = indexRingBufferPool(134217728)
 	Equal(t, 14, idx)
+}
+
+func TestRingBufferPool(t *testing.T) {
+	pool := NewRingBufferPool()
+
+	ringBuffer := magicring.NewMagicBuffer(os.Getpagesize())
+
+	pool.Put(ringBuffer)
+
+	ringBufferFromPool := pool.Get()
+
+	Equal(t, ringBuffer, ringBufferFromPool)
+	runtime.KeepAlive(ringBuffer)
+
+	ringBuffer = Get()
+
+	Put(ringBuffer)
+
+	ringBufferFromPool = Get()
+
+	Equal(t, ringBuffer, ringBufferFromPool)
+	runtime.KeepAlive(ringBuffer)
+}
+
+func TestRingBufferPoolCalibrate(t *testing.T) {
+	pool := NewRingBufferPool()
+
+	Equal(t, uint64(magicring.DefaultMagicBufferSize), pool.defaultSize)
+	// Equal(t, uint64(magicring.DefaultMagicBufferSize), pool.maxSize)
+
+	pool.calibrating = 0
+
+	pool.calibrate()
+
+	Equal(t, uint64(magicring.DefaultMagicBufferSize), pool.defaultSize)
+	Equal(t, uint64(67108864), pool.maxSize)
+
+	pool.calls[4] = 3278
+	pool.calls[9] = 12312
+	pool.calls[13] = 1000
+
+	pool.calibrate()
+
+	Equal(t, uint64(2097152), pool.defaultSize)
+	Equal(t, uint64(33554432), pool.maxSize)
+
+	pool.calibrating = 1
+
+	pool.calls[4] = 32780
+	pool.calls[9] = 12312
+	pool.calls[13] = 21000
+
+	pool.calibrate()
+
+	Equal(t, uint64(2097152), pool.defaultSize)
+	Equal(t, uint64(33554432), pool.maxSize)
 }

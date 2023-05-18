@@ -16,6 +16,7 @@ package gain_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pawelgaczynski/gain"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
@@ -131,4 +132,48 @@ func TestReactorTCPMultipleReads(t *testing.T) {
 
 func TestReactorTCPAsyncHandlerMultipleReads(t *testing.T) {
 	testMultipleReads(t, gainNet.TCP, true, gain.Reactor)
+}
+
+func TestReactorRoundRobinLoadBalancer(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithLoadBalancing(gain.RoundRobin),
+		},
+	}, gain.Reactor)
+}
+
+func TestReactorLeastConnectionsLoadBalancer(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithLoadBalancing(gain.LeastConnections),
+		},
+	}, gain.Reactor)
+}
+
+func TestReactorSourceIPHashLoadBalancer(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithLoadBalancing(gain.SourceIPHash),
+		},
+	}, gain.Reactor)
+}
+
+func TestReactorManyWorkersManyClientsTCPKeepAlive(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithTCPKeepAlive(time.Minute),
+		},
+	}, gain.Reactor)
 }

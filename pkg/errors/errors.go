@@ -29,9 +29,7 @@ var (
 	ErrUnsupportedUDPProtocol = errors.New("only udp/udp4/udp6 are supported")
 	// ErrNoIPv4AddressOnInterface occurs when an IPv4 multicast address is set on an interface but IPv4 is not configured.
 	ErrNoIPv4AddressOnInterface = errors.New("no IPv4 address on interface")
-	// ErrNotImplemented occurs when not implemented feature is used.
-	ErrNotImplemented = errors.New("not implemented")
-	// ErrNotImplemented occurs when not supported feature is used.
+	// ErrNotSupported occurs when not supported feature is used.
 	ErrNotSupported = errors.New("not supported")
 	// ErrSkippable indicates an error that can be skipped and not handled as an usual flow breaking error.
 	ErrSkippable = errors.New("skippable")
@@ -41,9 +39,6 @@ var (
 	ErrConnectionAlreadyClosed = errors.New("connection already closed")
 	// ErrConnectionAlreadyClosed when trying to work with closed connection.
 	ErrConnectionClosed = errors.New("connection closed")
-	// ErrConnectionIsMissing occurs when trying to access connection that is missing.
-	// For TCP connections key is the file descriptor.
-	ErrConnectionIsMissing = errors.New("connection is missing")
 	// ErrOpNotAvailableInMode occurs when trying to run operation that is not available in current mode.
 	ErrOpNotAvailableInMode = errors.New("op is not available in mode")
 	// ErrConnectionQueueIsNil occurs when trying to access connection queue that is not initialized.
@@ -59,10 +54,6 @@ var (
 	// ErrServerAlreadyRunning occurs when trying to start already running server.
 	ErrServerAlreadyRunning = errors.New("server already running")
 )
-
-func ErrorConnectionIsMissing(key int) error {
-	return fmt.Errorf("%w, key: %d", ErrConnectionIsMissing, key)
-}
 
 func ErrorOpNotAvailableInMode(op, mode string) error {
 	return fmt.Errorf("%w, op: %s, mode: %s", ErrOpNotAvailableInMode, op, mode)

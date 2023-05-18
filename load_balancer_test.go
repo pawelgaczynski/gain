@@ -18,6 +18,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/pawelgaczynski/gain/pkg/errors"
 	. "github.com/stretchr/testify/require"
 )
 
@@ -155,4 +156,83 @@ func TestLeastConnectionsLoadBalander(t *testing.T) {
 	err = worker.loop(0)
 	Nil(t, err)
 	Same(t, worker, workers[3])
+}
+
+func TestSourceIPHashLoadBalancer(t *testing.T) {
+	loadBl := newSourceIPHashLoadBalancer()
+
+	workers := createTestWorkers()
+	for _, worker := range workers {
+		loadBl.register(worker)
+	}
+	workers[0].conns = 1
+	workers[1].conns = 0
+	workers[2].conns = 2
+	workers[3].conns = 1
+	addr, err := net.ResolveTCPAddr("tcp", "10.3.2.1:1234")
+	Nil(t, err)
+	worker := loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[2])
+	addr, err = net.ResolveTCPAddr("tcp", "10.123.5.1:51234")
+	Nil(t, err)
+	worker = loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[0])
+	addr, err = net.ResolveTCPAddr("tcp", "10.123.5.31:52354")
+	Nil(t, err)
+	worker = loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[2])
+	addr, err = net.ResolveTCPAddr("tcp", "192.123.19.1:1234")
+	Nil(t, err)
+	worker = loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[1])
+	addr, err = net.ResolveTCPAddr("tcp", "10.123.5.31:52354")
+	Nil(t, err)
+	worker = loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[2])
+	addr, err = net.ResolveTCPAddr("tcp", "192.123.19.1:1234")
+	Nil(t, err)
+	worker = loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[1])
+	addr, err = net.ResolveTCPAddr("tcp", "10.123.5.1:51234")
+	Nil(t, err)
+	worker = loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[0])
+	addr, err = net.ResolveTCPAddr("tcp", "10.123.5.31:52354")
+	Nil(t, err)
+	worker = loadBl.next(addr)
+	err = worker.loop(0)
+	Nil(t, err)
+	Same(t, worker, workers[2])
+}
+
+func TestCreateLoadBalancer(t *testing.T) {
+	lb, err := createLoadBalancer(RoundRobin)
+	NoError(t, err)
+	IsType(t, &roundRobinLoadBalancer{}, lb)
+
+	lb, err = createLoadBalancer(LeastConnections)
+	NoError(t, err)
+	IsType(t, &leastConnectionsLoadBalancer{}, lb)
+
+	lb, err = createLoadBalancer(SourceIPHash)
+	NoError(t, err)
+	IsType(t, &sourceIPHashLoadBalancer{}, lb)
+
+	lb, err = createLoadBalancer(10)
+	ErrorIs(t, errors.ErrNotSupported, err)
+	Nil(t, lb)
 }

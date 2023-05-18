@@ -15,8 +15,6 @@
 package iouring
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"syscall"
 	"unsafe"
@@ -64,12 +62,9 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 			fileDescriptor, int64(offcqRing), int(ring.cqRing.ringSize), syscall.PROT_READ|syscall.PROT_WRITE,
 			syscall.MAP_SHARED|syscall.MAP_POPULATE)
 		if err != nil {
-			unmapErr := ring.UnmapRings()
-			if unmapErr != nil {
-				log.Panic(unmapErr)
-			}
+			ring.UnmapRings()
 
-			return fmt.Errorf("failed to unmap rings: %w", err)
+			return os.NewSyscallError("mmap", err)
 		}
 		ring.cqRing.buffer = data
 	}
@@ -97,12 +92,9 @@ func (ring *Ring) mmap(fileDescriptor int) error {
 		syscall.MAP_SHARED|syscall.MAP_POPULATE,
 	)
 	if err != nil {
-		unmapErr := ring.UnmapRings()
-		if unmapErr != nil {
-			log.Panic(unmapErr)
-		}
+		ring.UnmapRings()
 
-		return fmt.Errorf("failed to unmap rings: %w", err)
+		return os.NewSyscallError("mmap", err)
 	}
 	ring.sqRing.sqeBuffer = buff
 	cqRingPtr := uintptr(unsafe.Pointer(&ring.cqRing.buffer[0]))
@@ -133,20 +125,10 @@ func (ring *Ring) munmap() error {
 	return os.NewSyscallError("munmap", syscall.Munmap(ring.sqRing.sqeBuffer))
 }
 
-func (ring *Ring) UnmapRings() error {
-	var firstErr, secondErr error
-	firstErr = syscall.Munmap(ring.sqRing.buffer)
+func (ring *Ring) UnmapRings() {
+	_ = syscall.Munmap(ring.sqRing.buffer)
 
 	if ring.cqRing.buffer != nil && &ring.cqRing.buffer[0] != &ring.sqRing.buffer[0] {
-		secondErr = syscall.Munmap(ring.cqRing.buffer)
+		_ = syscall.Munmap(ring.cqRing.buffer)
 	}
-
-	if firstErr != nil || secondErr != nil {
-		//nolint:errorlint,goerr113
-		return fmt.Errorf(
-			"unmap first error: %s, second error: %s", firstErr.Error(), secondErr.Error(),
-		)
-	}
-
-	return nil
 }

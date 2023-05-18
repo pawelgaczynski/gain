@@ -15,18 +15,18 @@
 package iouring
 
 import (
-	"errors"
-	"fmt"
+	"os"
+	"syscall"
+	"testing"
+
+	. "github.com/stretchr/testify/require"
 )
 
-var (
-	ErrNotSupported       = errors.New("not supported")
-	ErrTimerExpired       = errors.New("timer expired")
-	ErrInterrupredSyscall = errors.New("interrupred system call")
-	ErrAgain              = errors.New("try again")
-	ErrSQEOverflow        = errors.New("SQE overflow")
-)
-
-func ErrorSQEOverflow(overflowValue uint32) error {
-	return fmt.Errorf("%w: %d", ErrSQEOverflow, overflowValue)
+func TestConvertErrno(t *testing.T) {
+	EqualValues(t, ErrTimerExpired, convertErrno(syscall.ETIME))
+	EqualValues(t, ErrInterrupredSyscall, convertErrno(syscall.EINTR))
+	EqualValues(t, ErrAgain, convertErrno(syscall.EAGAIN))
+	EqualValues(t, os.NewSyscallError("io_uring_enter", syscall.EINVAL), convertErrno(syscall.EINVAL))
+	EqualValues(t, os.NewSyscallError("io_uring_enter", syscall.EBADF), convertErrno(syscall.EBADF))
+	EqualValues(t, os.NewSyscallError("io_uring_enter", syscall.EBUSY), convertErrno(syscall.EBUSY))
 }

@@ -17,6 +17,7 @@ package gain_test
 import (
 	"crypto/rand"
 	"testing"
+	"time"
 
 	"github.com/pawelgaczynski/gain"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
@@ -152,7 +153,7 @@ func TestShardingCloseSeverWithConnectedClients(t *testing.T) {
 }
 
 func TestShardingReleasingUDPConns(t *testing.T) {
-	testHandler := newConnServerTester(10, true)
+	testHandler := newConnServerTester(gainNet.UDP, 10, true)
 	server, port := newTestConnServer(t, gainNet.UDP, false, gain.SocketSharding, testHandler.testServerHandler)
 
 	clientsGroup := newTestConnClientGroup(t, gainNet.UDP, port, 10)
@@ -209,4 +210,49 @@ func TestShardingTCPMultipleReads(t *testing.T) {
 
 func TestShardingTCPAsyncHandlerMultipleReads(t *testing.T) {
 	testMultipleReads(t, gainNet.TCP, true, gain.SocketSharding)
+}
+
+func TestShardingManyWorkersManyClientsWithCBPF(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithCBPF(true),
+		},
+	}, gain.SocketSharding)
+}
+
+func TestShardingManyWorkersManyClientsSocketBuffers(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithSocketRecvBufferSize(2048),
+			gain.WithSocketSendBufferSize(2048),
+		},
+	}, gain.SocketSharding)
+}
+
+func TestShardingManyWorkersManyClientsTCPKeepAlive(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithTCPKeepAlive(time.Minute),
+		},
+	}, gain.SocketSharding)
+}
+
+func TestShardingManyWorkersManyClientsCPUAffinity(t *testing.T) {
+	testServer(t, testServerConfig{
+		protocol:        gainNet.TCP,
+		numberOfClients: 16,
+		numberOfWorkers: 8,
+		configOptions: []gain.ConfigOption{
+			gain.WithCPUAffinity(true),
+		},
+	}, gain.SocketSharding)
 }

@@ -134,17 +134,7 @@ func (ring *Ring) QueueExit() error {
 		return err
 	}
 
-	err = ring.UnmapRings()
-	if err != nil {
-		return err
-	}
-
-	if ring.intFlags&IntFlagRegRing > 0 {
-		_, err = ring.UnregisterRingFd()
-		if err != nil {
-			return err
-		}
-	}
+	ring.UnmapRings()
 
 	err = ring.Close()
 	if err != nil {

@@ -15,7 +15,6 @@
 package gain
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"sync/atomic"
@@ -158,6 +157,10 @@ func (c *connection) userOpAllowed(name string) error {
 }
 
 func (c *connection) SetReadBuffer(bytes int) error {
+	err := c.userOpAllowed("setReadBuffer")
+	if err != nil {
+		return err
+	}
 	//nolint:wrapcheck
 	return socket.SetRecvBuffer(c.fd, bytes)
 }
@@ -230,12 +233,8 @@ func (c *connection) Next(n int) ([]byte, error) {
 		return nil, err
 	}
 
-	bytes, err := c.inboundBuffer.Next(n)
-	if err != nil {
-		return nil, fmt.Errorf("connection inbound buffer Next error: %w", err)
-	}
-
-	return bytes, nil
+	//nolint:wrapcheck
+	return c.inboundBuffer.Next(n)
 }
 
 func (c *connection) Discard(n int) (int, error) {
@@ -262,12 +261,8 @@ func (c *connection) ReadFrom(reader io.Reader) (int64, error) {
 		return 0, err
 	}
 
-	bytesRead, err := c.outboundBuffer.ReadFrom(reader)
-	if err != nil {
-		return 0, fmt.Errorf("connection outbound buffer ReadFrom error: %w", err)
-	}
-
-	return bytesRead, nil
+	//nolint:wrapcheck
+	return c.outboundBuffer.ReadFrom(reader)
 }
 
 func (c *connection) WriteTo(writer io.Writer) (int64, error) {
@@ -276,12 +271,8 @@ func (c *connection) WriteTo(writer io.Writer) (int64, error) {
 		return 0, err
 	}
 
-	bytesWritten, err := c.inboundBuffer.WriteTo(writer)
-	if err != nil {
-		return 0, fmt.Errorf("connection inbound buffer WriteTo error: %w", err)
-	}
-
-	return bytesWritten, nil
+	//nolint:wrapcheck
+	return c.inboundBuffer.WriteTo(writer)
 }
 
 func (c *connection) Read(buffer []byte) (int, error) {
@@ -290,12 +281,8 @@ func (c *connection) Read(buffer []byte) (int, error) {
 		return 0, err
 	}
 
-	bytesRead, err := c.inboundBuffer.Read(buffer)
-	if err != nil {
-		return 0, fmt.Errorf("connection inbound buffer Read error: %w", err)
-	}
-
-	return bytesRead, nil
+	//nolint:wrapcheck
+	return c.inboundBuffer.Read(buffer)
 }
 
 func (c *connection) Write(buffer []byte) (int, error) {
@@ -304,12 +291,8 @@ func (c *connection) Write(buffer []byte) (int, error) {
 		return 0, err
 	}
 
-	bytesWritten, err := c.outboundBuffer.Write(buffer)
-	if err != nil {
-		return 0, fmt.Errorf("connection outbound buffer Write error: %w", err)
-	}
-
-	return bytesWritten, nil
+	//nolint:wrapcheck
+	return c.outboundBuffer.Write(buffer)
 }
 
 func (c *connection) OutboundBuffered() int {

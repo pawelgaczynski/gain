@@ -18,6 +18,8 @@ package byteslice
 import (
 	"runtime/debug"
 	"testing"
+
+	. "github.com/stretchr/testify/require"
 )
 
 func TestByteSlice(t *testing.T) {
@@ -63,4 +65,13 @@ func BenchmarkByteSlice(b *testing.B) {
 			}
 		})
 	})
+}
+
+func TestByteSlicePool(t *testing.T) {
+	pool := NewByteSlicePool()
+
+	pool.Put(make([]byte, 0))
+
+	Nil(t, pool.Get(-1))
+	Nil(t, pool.Get(0))
 }

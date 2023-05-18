@@ -26,7 +26,7 @@ import (
 
 func testConnectionHandling(t *testing.T, architecture gain.ServerArchitecture) {
 	t.Helper()
-	testHandler := newConnServerTester(0, false)
+	testHandler := newConnServerTester(gainNet.TCP, 0, false)
 	server, port := newTestConnServer(t, gainNet.TCP, false, architecture, testHandler.testServerHandler)
 
 	defer func() {
@@ -36,7 +36,7 @@ func testConnectionHandling(t *testing.T, architecture gain.ServerArchitecture) 
 	var connWaitGroup sync.WaitGroup
 
 	connWaitGroup.Add(10)
-	testHandler.onAcceptCallback = func(_ gain.Conn) {
+	testHandler.onAcceptCallback = func(_ gain.Conn, _ string) {
 		connWaitGroup.Done()
 	}
 

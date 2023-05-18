@@ -28,8 +28,21 @@ const (
 	EnterRegisteredRing
 )
 
-func (ring *Ring) enter(submitted uint32, waitNr uint32, flags uint32, sig unsafe.Pointer, raw bool) (uint, error) {
-	return ring.enter2(submitted, waitNr, flags, sig, nSig/szDivider, raw)
+func convertErrno(errno syscall.Errno) error {
+	switch errno {
+	case syscall.ETIME:
+		return ErrTimerExpired
+	case syscall.EINTR:
+		return ErrInterrupredSyscall
+	case syscall.EAGAIN:
+		return ErrAgain
+	default:
+		return os.NewSyscallError("io_uring_enter", errno)
+	}
+}
+
+func (ring *Ring) enter(submitted uint32, waitNr uint32, flags uint32, sig unsafe.Pointer) (uint, error) {
+	return ring.enter2(submitted, waitNr, flags, sig, nSig/szDivider)
 }
 
 func (ring *Ring) enter2(
@@ -38,46 +51,24 @@ func (ring *Ring) enter2(
 	flags uint32,
 	sig unsafe.Pointer,
 	size int,
-	raw bool,
 ) (uint, error) {
 	var (
 		consumed uintptr
 		errno    syscall.Errno
 	)
 
-	if raw {
-		consumed, _, errno = syscall.RawSyscall6(
-			sysEnter,
-			uintptr(ring.enterRingFd),
-			uintptr(submitted),
-			uintptr(waitNr),
-			uintptr(flags),
-			uintptr(sig),
-			uintptr(size),
-		)
-	} else {
-		consumed, _, errno = syscall.Syscall6(
-			sysEnter,
-			uintptr(ring.enterRingFd),
-			uintptr(submitted),
-			uintptr(waitNr),
-			uintptr(flags),
-			uintptr(sig),
-			uintptr(size),
-		)
-	}
+	consumed, _, errno = syscall.Syscall6(
+		sysEnter,
+		uintptr(ring.enterRingFd),
+		uintptr(submitted),
+		uintptr(waitNr),
+		uintptr(flags),
+		uintptr(sig),
+		uintptr(size),
+	)
 
-	switch errno {
-	case syscall.ETIME:
-		return 0, ErrTimerExpired
-	case syscall.EINTR:
-		return 0, ErrInterrupredSyscall
-	case syscall.EAGAIN:
-		return 0, ErrAgain
-	default:
-		if errno != 0 {
-			return 0, os.NewSyscallError("io_uring_enter", errno)
-		}
+	if errno > 0 {
+		return 0, convertErrno(errno)
 	}
 
 	return uint(consumed), nil

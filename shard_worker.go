@@ -55,9 +55,6 @@ func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
 	w.logDebug().Int("fd", fileDescriptor).Msg("Connection accepted")
 
 	conn := w.connectionManager.getFd(fileDescriptor)
-	if conn == nil {
-		return gainErrors.ErrorConnectionIsMissing(fileDescriptor)
-	}
 	conn.fd = fileDescriptor
 	conn.localAddr = w.localAddr
 
@@ -93,9 +90,7 @@ func (w *shardWorker) stopAccept() error {
 }
 
 func (w *shardWorker) activeConnections() int {
-	return w.connectionManager.activeConnections(func(c *connection) bool {
-		return c.fd != w.fd
-	})
+	return w.connectionManager.activeConnections() - 1
 }
 
 func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueEvent) {
@@ -181,9 +176,6 @@ func (w *shardWorker) initLoop() {
 			w.startedChan <- done
 			// 1 is always index for main socket
 			conn := w.connectionManager.get(1, w.fd)
-			if conn == nil {
-				return gainErrors.ErrorConnectionIsMissing(1)
-			}
 			conn.fd = w.fd
 			conn.initMsgHeader()
 
@@ -216,7 +208,6 @@ func (w *shardWorker) loop(fd int) error {
 	w.initLoop()
 
 	loopErr := w.startLoop(w.index(), func(cqe *iouring.CompletionQueueEvent) error {
-		var err error
 		if exit := w.processEvent(cqe, func(cqe *iouring.CompletionQueueEvent) bool {
 			keyOrFd := cqe.UserData() & ^allFlagsMask
 			if acceptReqFailedAfterStop := keyOrFd == uint64(w.fd) &&
@@ -236,19 +227,6 @@ func (w *shardWorker) loop(fd int) error {
 			connFd = w.fd
 		}
 		conn := w.connectionManager.get(key, connFd)
-		if conn == nil {
-			if w.connectionProtocol {
-				_ = w.syscallCloseSocket(connFd)
-			}
-			logEvent := w.logError(err)
-			if w.connectionProtocol {
-				logEvent = logEvent.Int("conn fd", connFd)
-			}
-
-			logEvent.Msg("Get connection error")
-
-			return nil
-		}
 		w.handleConn(conn, cqe)
 
 		return nil
