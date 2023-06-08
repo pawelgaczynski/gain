@@ -24,7 +24,7 @@ import (
 )
 
 func TestSubmitAndWait(t *testing.T) {
-	ring, err := CreateRing()
+	ring, err := CreateRing(16)
 	NoError(t, err)
 
 	defer ring.Close()
@@ -44,7 +44,7 @@ func TestSubmitAndWait(t *testing.T) {
 }
 
 func TestSubmitAndWaitNilTimeout(t *testing.T) {
-	ring, err := CreateRing()
+	ring, err := CreateRing(16)
 	NoError(t, err)
 
 	defer ring.Close()

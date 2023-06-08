@@ -253,7 +253,7 @@ func (w *shardWorker) closeAllConnsAndRings() {
 func newShardWorker(
 	index int, localAddr net.Addr, config shardWorkerConfig, eventHandler EventHandler,
 ) (*shardWorker, error) {
-	ring, err := iouring.CreateRing()
+	ring, err := iouring.CreateRing(config.maxSQEntries)
 	if err != nil {
 		return nil, fmt.Errorf("creating ring error: %w", err)
 	}

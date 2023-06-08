@@ -98,7 +98,7 @@ func udpLoop(t *testing.T, ring *iouring.Ring, socketFd int, connection *udpConn
 }
 
 func TestUDPRecvSend(t *testing.T) {
-	ring, err := iouring.CreateRing()
+	ring, err := iouring.CreateRing(16)
 	Nil(t, err)
 
 	defer ring.Close()

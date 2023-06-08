@@ -24,7 +24,7 @@ import (
 )
 
 func TestMsgRingItself(t *testing.T) {
-	ring, err := iouring.CreateRing()
+	ring, err := iouring.CreateRing(16)
 	Nil(t, err)
 
 	defer ring.Close()
@@ -94,12 +94,12 @@ func TestMsgRingItself(t *testing.T) {
 }
 
 func TestMsgRing(t *testing.T) {
-	senderRing, err := iouring.CreateRing()
+	senderRing, err := iouring.CreateRing(16)
 	Nil(t, err)
 
 	defer senderRing.Close()
 
-	receiverRing, err := iouring.CreateRing()
+	receiverRing, err := iouring.CreateRing(16)
 	Nil(t, err)
 
 	defer receiverRing.Close()

@@ -42,6 +42,7 @@ type workerStartListener func()
 type workerConfig struct {
 	cpuAffinity     bool
 	processPriority bool
+	maxSQEntries    uint
 	maxCQEvents     int
 	loggerLevel     zerolog.Level
 	prettyLogger    bool

@@ -148,7 +148,7 @@ type testCase struct {
 }
 
 func TestMagicRingRecvSend(t *testing.T) {
-	ring, err := iouring.CreateRing()
+	ring, err := iouring.CreateRing(16)
 	Nil(t, err)
 
 	defer ring.Close()
