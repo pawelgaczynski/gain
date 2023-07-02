@@ -217,6 +217,8 @@ func newTestConnServer(
 		gain.WithWorkers(4),
 		gain.WithArchitecture(architecture),
 		gain.WithAsyncHandler(async),
+		gain.WithMaxSQEntries(1024),
+		gain.WithMaxCQEvents(1024),
 	}
 
 	config := gain.NewConfig(opts...)

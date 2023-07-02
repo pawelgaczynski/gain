@@ -118,7 +118,7 @@ func (ring *Ring) QueueInit(entries uint, flags uint32) error {
 	return ring.QueueInitParams(entries)
 }
 
-func (ring *Ring) Close() error {
+func (ring *Ring) close() error {
 	if ring.fd != 0 {
 		return os.NewSyscallError("close", syscall.Close(ring.fd))
 	}
@@ -136,7 +136,7 @@ func (ring *Ring) QueueExit() error {
 
 	ring.UnmapRings()
 
-	err = ring.Close()
+	err = ring.close()
 	if err != nil {
 		return err
 	}

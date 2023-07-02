@@ -164,6 +164,7 @@ func (a *acceptorWorker) loop(fd int) error {
 		return nil
 	})
 
+	a.close()
 	a.notifyFinish()
 
 	return err
@@ -172,7 +173,7 @@ func (a *acceptorWorker) loop(fd int) error {
 func newAcceptorWorker(
 	config acceptorWorkerConfig, loadBalancer loadBalancer, eventHandler EventHandler, features supportedFeatures,
 ) (*acceptorWorker, error) {
-	ring, err := iouring.CreateRing()
+	ring, err := iouring.CreateRing(config.maxSQEntries)
 	if err != nil {
 		return nil, fmt.Errorf("creating ring error: %w", err)
 	}

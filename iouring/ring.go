@@ -80,13 +80,13 @@ func newRing() *Ring {
 	}
 }
 
-func CreateRing() (*Ring, error) {
+func CreateRing(sqeSize uint) (*Ring, error) {
 	var (
 		ring  = newRing()
 		flags uint32
 	)
 
-	err := ring.QueueInit(defaultMaxQueue, flags)
+	err := ring.QueueInit(sqeSize, flags)
 	if err != nil {
 		return nil, err
 	}
