@@ -19,5 +19,4 @@ const (
 	szDivider               = 8
 	registerRingFdOffset    = uint32(4294967295)
 	regIOWQMaxWorkersNrArgs = 2
-	defaultMaxQueue         = uint(1024)
 )

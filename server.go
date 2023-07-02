@@ -130,9 +130,10 @@ func (e *engine) startReactor(listener *listener, features supportedFeatures) er
 		workerConfig: workerConfig{
 			cpuAffinity:     e.config.CPUAffinity,
 			processPriority: e.config.ProcessPriority,
-			maxCQEvents:     defaultMaxCQEvents,
+			maxCQEvents:     int(e.config.MaxCQEvents),
 			loggerLevel:     e.config.LoggerLevel,
 			prettyLogger:    e.config.PrettyLogger,
+			maxSQEntries:    e.config.MaxSQEntries,
 		},
 		tcpKeepAlive: e.config.TCPKeepAlive,
 	}, lb, e.eventHandler, features)
@@ -151,9 +152,10 @@ func (e *engine) startReactor(listener *listener, features supportedFeatures) er
 			readWriteWorkerConfig: readWriteWorkerConfig{
 				workerConfig: workerConfig{
 					cpuAffinity:  e.config.CPUAffinity,
-					maxCQEvents:  defaultMaxCQEvents,
+					maxCQEvents:  int(e.config.MaxCQEvents),
 					loggerLevel:  e.config.LoggerLevel,
 					prettyLogger: e.config.PrettyLogger,
+					maxSQEntries: e.config.MaxSQEntries,
 				},
 				asyncHandler:  e.config.AsyncHandler,
 				goroutinePool: e.config.GoroutinePool,
@@ -207,9 +209,10 @@ func (e *engine) startSocketSharding(listeners []*listener, protocol string) err
 			readWriteWorkerConfig: readWriteWorkerConfig{
 				workerConfig: workerConfig{
 					cpuAffinity:  e.config.CPUAffinity,
-					maxCQEvents:  defaultMaxCQEvents,
+					maxCQEvents:  int(e.config.MaxCQEvents),
 					loggerLevel:  e.config.LoggerLevel,
 					prettyLogger: e.config.PrettyLogger,
+					maxSQEntries: e.config.MaxSQEntries,
 				},
 				asyncHandler:  e.config.AsyncHandler,
 				goroutinePool: e.config.GoroutinePool,

@@ -37,6 +37,8 @@ func TestConfig(t *testing.T) {
 		WithTCPKeepAlive(time.Second),
 		WithLoggerLevel(zerolog.DebugLevel),
 		WithPrettyLogger(true),
+		WithMaxSQEntries(4096),
+		WithMaxCQEvents(4096),
 	}
 
 	config := NewConfig(opts...)
@@ -54,4 +56,6 @@ func TestConfig(t *testing.T) {
 	Equal(t, time.Second, config.TCPKeepAlive)
 	Equal(t, zerolog.DebugLevel, config.LoggerLevel)
 	Equal(t, true, config.PrettyLogger)
+	Equal(t, uint(4096), config.MaxSQEntries)
+	Equal(t, uint(4096), config.MaxCQEvents)
 }

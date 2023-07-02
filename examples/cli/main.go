@@ -56,7 +56,7 @@ var contains = func(s []string, str string) bool {
 	return false
 }
 
-var config = &cmdConfig{}
+var config = &cmdConfig{Config: gain.NewConfig()}
 
 var flags = []cli.Flag{
 	&cli.StringFlag{

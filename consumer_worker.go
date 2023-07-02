@@ -181,6 +181,7 @@ func (c *consumerWorker) loop(_ int) error {
 	c.loopFinisher = c.handleJobsInQueues
 	c.loopFinishCondition = func() bool {
 		if c.connectionManager.allClosed() {
+			c.close()
 			c.notifyFinish()
 
 			return true
@@ -218,7 +219,7 @@ func (c *consumerWorker) loop(_ int) error {
 func newConsumerWorker(
 	index int, localAddr net.Addr, config consumerConfig, eventHandler EventHandler, features supportedFeatures,
 ) (*consumerWorker, error) {
-	ring, err := iouring.CreateRing()
+	ring, err := iouring.CreateRing(config.maxSQEntries)
 	if err != nil {
 		return nil, fmt.Errorf("creating ring error: %w", err)
 	}

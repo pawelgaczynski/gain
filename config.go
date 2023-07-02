@@ -23,7 +23,8 @@ import (
 
 const (
 	defaultPort           = 8080
-	defaultMaxCQEvents    = 512
+	defaultMaxCQEvents    = 16384
+	defaultMaxSQEntries   = 16384
 	defaultRecvBufferSize = 4096
 	defaultSendBufferSize = 4096
 )
@@ -82,6 +83,15 @@ type Config struct {
 	// PrettyLogger sets the pretty-printing zerolog mode.
 	// Important: it is inefficient so should be used only for debugging.
 	PrettyLogger bool
+
+	// ==============================
+	// io_uring related options
+	// ==============================
+	// MaxSQEntries sets the maximum number of SQEs that can be submitted in one batch.
+	// If the number of SQEs exceeds this value, the io_uring will return a SQE overflow error.
+	MaxSQEntries uint
+	// MaxCQEvents sets the maximum number of CQEs that can be retrieved in one batch.
+	MaxCQEvents uint
 }
 
 // WithArchitecture sets the architecture of gain engine.
@@ -175,6 +185,20 @@ func WithPrettyLogger(prettyLogger bool) ConfigOption {
 	}
 }
 
+// WithMaxSQEntries sets the maximum number of entries in the submission queue.
+func WithMaxSQEntries(maxSQEntries uint) ConfigOption {
+	return func(c *Config) {
+		c.MaxSQEntries = maxSQEntries
+	}
+}
+
+// WithMaxCQEvents sets the maximum number of entries in the completion queue.
+func WithMaxCQEvents(maxCQEvents uint) ConfigOption {
+	return func(c *Config) {
+		c.MaxCQEvents = maxCQEvents
+	}
+}
+
 func NewConfig(opts ...ConfigOption) Config {
 	config := Config{
 		Architecture:         Reactor,
@@ -190,6 +214,8 @@ func NewConfig(opts ...ConfigOption) Config {
 		SocketRecvBufferSize: 0,
 		SocketSendBufferSize: 0,
 		TCPKeepAlive:         0,
+		MaxSQEntries:         defaultMaxSQEntries,
+		MaxCQEvents:          defaultMaxCQEvents,
 	}
 	for _, opt := range opts {
 		opt(&config)

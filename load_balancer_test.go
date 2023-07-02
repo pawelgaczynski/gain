@@ -63,6 +63,9 @@ func (w *testWorker) started() bool {
 	return true
 }
 
+func (w *testWorker) close() {
+}
+
 func createTestWorkers() []*testWorker {
 	workers := make([]*testWorker, 0)
 	for i := 0; i < numberOfTestWorkers; i++ {
