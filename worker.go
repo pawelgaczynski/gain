@@ -35,6 +35,7 @@ type worker interface {
 	shutdown()
 	ringFd() int
 	started() bool
+	close()
 }
 
 type workerStartListener func()
@@ -117,6 +118,16 @@ func (w *workerImpl) logWarn() *zerolog.Event {
 
 func (w *workerImpl) logError(err error) *zerolog.Event {
 	return w.logger.Error().Int("worker index", w.index()).Int("ring fd", w.ringFd()).Err(err)
+}
+
+func (w *workerImpl) close() {
+	if w.looper.ring != nil {
+		err := w.looper.ring.QueueExit()
+		if err != nil {
+			w.logError(err).
+				Msg("Freeing ring error")
+		}
+	}
 }
 
 func newWorkerImpl(

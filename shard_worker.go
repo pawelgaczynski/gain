@@ -193,6 +193,7 @@ func (w *shardWorker) initLoop() {
 	w.loopFinisher = w.handleAsyncWritesIfEnabled
 	w.loopFinishCondition = func() bool {
 		if w.connectionManager.allClosed() || (w.connectionProtocol && !w.accepting.Load() && w.activeConnections() == 0) {
+			w.close()
 			w.notifyFinish()
 
 			return true

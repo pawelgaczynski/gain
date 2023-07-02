@@ -43,7 +43,9 @@ func TestPeekBatchCQE(t *testing.T) {
 	ring, err := CreateRing(16)
 	NoError(t, err)
 
-	defer ring.Close()
+	defer func() {
+		_ = ring.QueueExit()
+	}()
 
 	cqeBuff := make([]*CompletionQueueEvent, 16)
 

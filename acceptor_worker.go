@@ -164,6 +164,7 @@ func (a *acceptorWorker) loop(fd int) error {
 		return nil
 	})
 
+	a.close()
 	a.notifyFinish()
 
 	return err

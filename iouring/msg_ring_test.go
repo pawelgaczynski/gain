@@ -27,7 +27,9 @@ func TestMsgRingItself(t *testing.T) {
 	ring, err := iouring.CreateRing(16)
 	Nil(t, err)
 
-	defer ring.Close()
+	defer func() {
+		_ = ring.QueueExit()
+	}()
 
 	entry, err := ring.GetSQE()
 	Nil(t, err)
@@ -97,12 +99,16 @@ func TestMsgRing(t *testing.T) {
 	senderRing, err := iouring.CreateRing(16)
 	Nil(t, err)
 
-	defer senderRing.Close()
+	defer func() {
+		_ = senderRing.QueueExit()
+	}()
 
 	receiverRing, err := iouring.CreateRing(16)
 	Nil(t, err)
 
-	defer receiverRing.Close()
+	defer func() {
+		_ = receiverRing.QueueExit()
+	}()
 
 	entry, err := senderRing.GetSQE()
 	Nil(t, err)

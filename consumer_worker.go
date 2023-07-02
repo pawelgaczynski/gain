@@ -181,6 +181,7 @@ func (c *consumerWorker) loop(_ int) error {
 	c.loopFinisher = c.handleJobsInQueues
 	c.loopFinishCondition = func() bool {
 		if c.connectionManager.allClosed() {
+			c.close()
 			c.notifyFinish()
 
 			return true

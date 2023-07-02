@@ -101,7 +101,9 @@ func TestUDPRecvSend(t *testing.T) {
 	ring, err := iouring.CreateRing(16)
 	Nil(t, err)
 
-	defer ring.Close()
+	defer func() {
+		_ = ring.QueueExit()
+	}()
 
 	socketFd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_UDP)
 	Nil(t, err)
