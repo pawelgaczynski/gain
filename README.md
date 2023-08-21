@@ -74,7 +74,7 @@ Articles about the project:
 
 ### Prerequisites
 
-Gain requires Go 1.19+
+Gain requires Go 1.20+
 
 <br/>
 

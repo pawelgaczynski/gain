@@ -17,7 +17,7 @@ package gain
 import (
 	"syscall"
 
-	"github.com/pawelgaczynski/gain/iouring"
+	"github.com/pawelgaczynski/giouring"
 	"github.com/rs/zerolog"
 	"golang.org/x/sys/unix"
 )
@@ -60,7 +60,7 @@ type workerImpl struct {
 }
 
 func (w *workerImpl) ringFd() int {
-	return w.looper.ring.Fd()
+	return w.looper.ring.RingFd()
 }
 
 func (w *workerImpl) setIndex(index int) {
@@ -71,30 +71,30 @@ func (w *workerImpl) index() int {
 	return w.idx
 }
 
-func (w *workerImpl) processEvent(cqe *iouring.CompletionQueueEvent,
-	skipErrorChecker func(*iouring.CompletionQueueEvent) bool,
+func (w *workerImpl) processEvent(cqe *giouring.CompletionQueueEvent,
+	skipErrorChecker func(*giouring.CompletionQueueEvent) bool,
 ) bool {
 	w.logDebug().
-		Int32("Res", cqe.Res()).
-		Uint64("req key", cqe.UserData() & ^allFlagsMask).
-		Uint64("user data", cqe.UserData()).
-		Str("req flag", flagToString(cqe.UserData())).
+		Int32("Res", cqe.Res).
+		Uint64("req key", cqe.UserData & ^allFlagsMask).
+		Uint64("user data", cqe.UserData).
+		Str("req flag", flagToString(cqe.UserData)).
 		Msg("Process event")
 
 	switch {
-	case cqe.Res() < 0:
+	case cqe.Res < 0:
 		if !skipErrorChecker(cqe) {
 			w.logError(nil).
-				Str("error", unix.ErrnoName(-syscall.Errno(cqe.Res()))).
-				Str("req flag", flagToString(cqe.UserData())).
-				Uint64("req key", cqe.UserData() & ^allFlagsMask).
-				Uint64("user data", cqe.UserData()).
+				Str("error", unix.ErrnoName(-syscall.Errno(cqe.Res))).
+				Str("req flag", flagToString(cqe.UserData)).
+				Uint64("req key", cqe.UserData & ^allFlagsMask).
+				Uint64("user data", cqe.UserData).
 				Msg("worker request returns error code")
 		}
 
 		return true
 
-	case cqe.UserData() == 0:
+	case cqe.UserData == 0:
 		w.logError(nil).
 			Msg("user data flag is missing")
 
@@ -122,16 +122,12 @@ func (w *workerImpl) logError(err error) *zerolog.Event {
 
 func (w *workerImpl) close() {
 	if w.looper.ring != nil {
-		err := w.looper.ring.QueueExit()
-		if err != nil {
-			w.logError(err).
-				Msg("Freeing ring error")
-		}
+		w.looper.ring.QueueExit()
 	}
 }
 
 func newWorkerImpl(
-	ring *iouring.Ring, config workerConfig, index int, logger zerolog.Logger,
+	ring *giouring.Ring, config workerConfig, index int, logger zerolog.Logger,
 ) *workerImpl {
 	return &workerImpl{
 		logger:      logger,

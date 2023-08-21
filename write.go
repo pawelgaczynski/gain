@@ -15,20 +15,19 @@
 package gain
 
 import (
-	"fmt"
-
-	"github.com/pawelgaczynski/gain/iouring"
+	"github.com/pawelgaczynski/gain/pkg/errors"
+	"github.com/pawelgaczynski/giouring"
 )
 
 type writer struct {
-	ring    *iouring.Ring
+	ring    *giouring.Ring
 	sendMsg bool
 }
 
 func (w *writer) addWriteRequest(conn *connection, link bool) error {
-	entry, err := w.ring.GetSQE()
-	if err != nil {
-		return fmt.Errorf("error getting SQE: %w", err)
+	entry := w.ring.GetSQE()
+	if entry == nil {
+		return errors.ErrGettingSQE
 	}
 
 	if w.sendMsg {
@@ -44,7 +43,7 @@ func (w *writer) addWriteRequest(conn *connection, link bool) error {
 	}
 
 	if link {
-		entry.Flags |= iouring.SqeIOLink
+		entry.Flags |= giouring.SqeIOLink
 	}
 
 	conn.state = connWrite
@@ -53,7 +52,7 @@ func (w *writer) addWriteRequest(conn *connection, link bool) error {
 	return nil
 }
 
-func newWriter(ring *iouring.Ring, sendMsg bool) *writer {
+func newWriter(ring *giouring.Ring, sendMsg bool) *writer {
 	return &writer{
 		ring:    ring,
 		sendMsg: sendMsg,

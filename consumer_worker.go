@@ -20,10 +20,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	"github.com/pawelgaczynski/gain/logger"
 	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 	"github.com/pawelgaczynski/gain/pkg/queue"
+	"github.com/pawelgaczynski/giouring"
 )
 
 type consumerConfig struct {
@@ -75,7 +75,7 @@ func (c *consumerWorker) activeConnections() int {
 	return c.connectionManager.activeConnections()
 }
 
-func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueEvent) {
+func (c *consumerWorker) handleConn(conn *connection, cqe *giouring.CompletionQueueEvent) {
 	var (
 		err    error
 		errMsg string
@@ -89,9 +89,9 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 		}
 
 	case connWrite:
-		n := int(cqe.Res())
+		n := int(cqe.Res)
 		conn.onKernelWrite(n)
-		c.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+		c.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res).Msg("Bytes writed")
 
 		conn.setUserSpace()
 		c.eventHandler.OnWrite(conn, n)
@@ -102,12 +102,12 @@ func (c *consumerWorker) handleConn(conn *connection, cqe *iouring.CompletionQue
 		}
 
 	case connClose:
-		if cqe.UserData()&closeConnFlag > 0 {
+		if cqe.UserData&closeConnFlag > 0 {
 			c.closeConn(conn, false, nil)
-		} else if cqe.UserData()&writeDataFlag > 0 {
-			n := int(cqe.Res())
+		} else if cqe.UserData&writeDataFlag > 0 {
+			n := int(cqe.Res)
 			conn.onKernelWrite(n)
-			c.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+			c.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res).Msg("Bytes writed")
 			conn.setUserSpace()
 			c.eventHandler.OnWrite(conn, n)
 		}
@@ -190,20 +190,20 @@ func (c *consumerWorker) loop(_ int) error {
 		return false
 	}
 
-	return c.looper.startLoop(c.index(), func(cqe *iouring.CompletionQueueEvent) error {
-		if exit := c.processEvent(cqe, func(cqe *iouring.CompletionQueueEvent) bool {
-			keyOrFd := cqe.UserData() & ^allFlagsMask
+	return c.looper.startLoop(c.index(), func(cqe *giouring.CompletionQueueEvent) error {
+		if exit := c.processEvent(cqe, func(cqe *giouring.CompletionQueueEvent) bool {
+			keyOrFd := cqe.UserData & ^allFlagsMask
 
 			return c.connectionManager.get(int(keyOrFd), 0) == nil
 		}); exit {
 			return nil
 		}
-		if cqe.UserData()&addConnFlag > 0 {
-			fd := int(cqe.Res())
+		if cqe.UserData&addConnFlag > 0 {
+			fd := int(cqe.Res)
 
 			return c.handleNewConn(fd)
 		}
-		fileDescriptor := int(cqe.UserData() & ^allFlagsMask)
+		fileDescriptor := int(cqe.UserData & ^allFlagsMask)
 		if fileDescriptor < syscall.Stderr {
 			c.logError(nil).Int("fd", fileDescriptor).Msg("Invalid file descriptor")
 
@@ -219,7 +219,7 @@ func (c *consumerWorker) loop(_ int) error {
 func newConsumerWorker(
 	index int, localAddr net.Addr, config consumerConfig, eventHandler EventHandler, features supportedFeatures,
 ) (*consumerWorker, error) {
-	ring, err := iouring.CreateRing(config.maxSQEntries)
+	ring, err := giouring.CreateRing(uint32(config.maxSQEntries))
 	if err != nil {
 		return nil, fmt.Errorf("creating ring error: %w", err)
 	}

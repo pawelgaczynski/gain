@@ -18,15 +18,15 @@ import (
 	"errors"
 	"runtime"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
+	"github.com/pawelgaczynski/giouring"
 )
 
-type eventProcessor func(*iouring.CompletionQueueEvent) error
+type eventProcessor func(*giouring.CompletionQueueEvent) error
 
 type looper struct {
 	submitter
-	ring            *iouring.Ring
+	ring            *giouring.Ring
 	cpuAffinity     bool
 	processPriority bool
 	maxCQEvents     int
@@ -41,7 +41,7 @@ type looper struct {
 
 func (l *looper) innerLoop(eventProcessor eventProcessor) error {
 	var err error
-	cqes := make([]*iouring.CompletionQueueEvent, l.maxCQEvents)
+	cqes := make([]*giouring.CompletionQueueEvent, l.maxCQEvents)
 
 	for {
 		if continueLoop := l.shutdownHandler(); !continueLoop {
@@ -65,17 +65,18 @@ func (l *looper) innerLoop(eventProcessor eventProcessor) error {
 		}
 		numberOfCQEs := l.ring.PeekBatchCQE(cqes)
 
-		for i := 0; i < numberOfCQEs; i++ {
+		var i uint32
+		for i = 0; i < numberOfCQEs; i++ {
 			cqe := cqes[i]
 
 			err = eventProcessor(cqe)
 			if err != nil {
-				l.advance(uint32(i + 1))
+				l.advance(i + 1)
 
 				return err
 			}
 		}
-		l.advance(uint32(numberOfCQEs))
+		l.advance(numberOfCQEs)
 
 		if l.loopFinisher != nil {
 			l.loopFinisher()
@@ -126,7 +127,7 @@ func (l *looper) started() bool {
 }
 
 func newLooper(
-	ring *iouring.Ring, cpuAffinity bool, processPriority bool, maxCQEvents int,
+	ring *giouring.Ring, cpuAffinity bool, processPriority bool, maxCQEvents int,
 ) *looper {
 	return &looper{
 		submitter:       newBatchSubmitter(ring),

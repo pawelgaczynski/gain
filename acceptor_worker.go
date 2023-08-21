@@ -20,9 +20,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	"github.com/pawelgaczynski/gain/logger"
+	"github.com/pawelgaczynski/gain/pkg/errors"
 	"github.com/pawelgaczynski/gain/pkg/socket"
+	"github.com/pawelgaczynski/giouring"
 )
 
 type acceptorWorkerConfig struct {
@@ -34,7 +35,7 @@ type acceptorWorker struct {
 	*acceptor
 	*workerImpl
 	config        acceptorWorkerConfig
-	ring          *iouring.Ring
+	ring          *giouring.Ring
 	loadBalancer  loadBalancer
 	eventHandler  EventHandler
 	addConnMethod func(consumer, int32) error
@@ -43,9 +44,9 @@ type acceptorWorker struct {
 }
 
 func (a *acceptorWorker) addConnViaRing(worker consumer, fileDescriptor int32) error {
-	entry, err := a.ring.GetSQE()
-	if err != nil {
-		return fmt.Errorf("error getting SQE: %w", err)
+	entry := a.ring.GetSQE()
+	if entry == nil {
+		return errors.ErrGettingSQE
 	}
 
 	entry.PrepareMsgRing(worker.ringFd(), uint32(fileDescriptor), addConnFlag, 0)
@@ -102,8 +103,8 @@ func (a *acceptorWorker) loop(fd int) error {
 
 		return true
 	}
-	err := a.startLoop(0, func(cqe *iouring.CompletionQueueEvent) error {
-		if cqe.UserData()&addConnFlag > 0 {
+	err := a.startLoop(0, func(cqe *giouring.CompletionQueueEvent) error {
+		if cqe.UserData&addConnFlag > 0 {
 			return nil
 		}
 		err := a.addAcceptRequest()
@@ -115,16 +116,16 @@ func (a *acceptorWorker) loop(fd int) error {
 			return err
 		}
 
-		if exit := a.processEvent(cqe, func(cqe *iouring.CompletionQueueEvent) bool {
+		if exit := a.processEvent(cqe, func(cqe *giouring.CompletionQueueEvent) bool {
 			return !a.accepting.Load()
 		}); exit {
 			return nil
 		}
 
 		if a.config.tcpKeepAlive > 0 {
-			err = socket.SetKeepAlivePeriod(int(cqe.Res()), int(a.config.tcpKeepAlive.Seconds()))
+			err = socket.SetKeepAlivePeriod(int(cqe.Res), int(a.config.tcpKeepAlive.Seconds()))
 			if err != nil {
-				return fmt.Errorf("fd: %d, setting tcpKeepAlive error: %w", cqe.Res(), err)
+				return fmt.Errorf("fd: %d, setting tcpKeepAlive error: %w", cqe.Res, err)
 			}
 		}
 		var clientAddr net.Addr
@@ -133,9 +134,9 @@ func (a *acceptorWorker) loop(fd int) error {
 		if err != nil {
 			a.logError(err).
 				Int("fd", fd).
-				Int32("conn fd", cqe.Res()).
+				Int32("conn fd", cqe.Res).
 				Msg("Getting client address error")
-			_ = a.syscallCloseSocket(int(cqe.Res()))
+			_ = a.syscallCloseSocket(int(cqe.Res))
 
 			return nil
 		}
@@ -143,20 +144,20 @@ func (a *acceptorWorker) loop(fd int) error {
 		nextConsumer := a.loadBalancer.next(clientAddr)
 		a.logDebug().
 			Int("fd", fd).
-			Int32("conn fd", cqe.Res()).
+			Int32("conn fd", cqe.Res).
 			Int("consumer", nextConsumer.index()).
 			Msg("Forwarding accepted connection to consumer")
 
-		nextConsumer.setSocketAddr(int(cqe.Res()), clientAddr)
+		nextConsumer.setSocketAddr(int(cqe.Res), clientAddr)
 
-		err = a.addConnMethod(nextConsumer, cqe.Res())
+		err = a.addConnMethod(nextConsumer, cqe.Res)
 		if err != nil {
 			a.logError(err).
 				Int("fd", fd).
-				Int32("conn fd", cqe.Res()).
+				Int32("conn fd", cqe.Res).
 				Msg("Add connection to consumer error")
 
-			_ = a.syscallCloseSocket(int(cqe.Res()))
+			_ = a.syscallCloseSocket(int(cqe.Res))
 
 			return nil
 		}
@@ -173,7 +174,7 @@ func (a *acceptorWorker) loop(fd int) error {
 func newAcceptorWorker(
 	config acceptorWorkerConfig, loadBalancer loadBalancer, eventHandler EventHandler, features supportedFeatures,
 ) (*acceptorWorker, error) {
-	ring, err := iouring.CreateRing(config.maxSQEntries)
+	ring, err := giouring.CreateRing(uint32(config.maxSQEntries))
 	if err != nil {
 		return nil, fmt.Errorf("creating ring error: %w", err)
 	}
