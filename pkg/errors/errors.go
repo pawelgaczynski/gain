@@ -53,6 +53,8 @@ var (
 	ErrAddressNotFound = errors.New("address could not be found")
 	// ErrServerAlreadyRunning occurs when trying to start already running server.
 	ErrServerAlreadyRunning = errors.New("server already running")
+	// ErrGettingSQE occurs when SQE could not be obtained.
+	ErrGettingSQE = errors.New("error getting SQE")
 )
 
 func ErrorOpNotAvailableInMode(op, mode string) error {

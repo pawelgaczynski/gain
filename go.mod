@@ -1,15 +1,16 @@
 module github.com/pawelgaczynski/gain
 
-go 1.19
+go 1.20
 
 require (
 	github.com/alitto/pond v1.7.1
+	github.com/pawelgaczynski/giouring v0.0.0-20230821111130-24e7a29bc73d
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.26.1
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.23.7
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
-	golang.org/x/sys v0.1.0
+	golang.org/x/sys v0.11.0
 )
 
 require (

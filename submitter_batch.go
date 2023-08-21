@@ -20,8 +20,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
+	"github.com/pawelgaczynski/giouring"
 )
 
 var waitForArray = []uint32{
@@ -47,16 +47,16 @@ var waitForArray = []uint32{
 }
 
 type batchSubmitter struct {
-	ring            *iouring.Ring
+	ring            *giouring.Ring
 	timeoutTimeSpec syscall.Timespec
 	waitForIndex    uint32
 	waitFor         uint32
 }
 
 func (s *batchSubmitter) submit() error {
-	_, err := s.ring.SubmitAndWaitTimeout(s.waitFor, &s.timeoutTimeSpec)
-	if errors.Is(err, iouring.ErrAgain) || errors.Is(err, iouring.ErrInterrupredSyscall) ||
-		errors.Is(err, iouring.ErrTimerExpired) {
+	_, err := s.ring.SubmitAndWaitTimeout(s.waitFor, &s.timeoutTimeSpec, nil)
+	if errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EINTR) ||
+		errors.Is(err, syscall.ETIME) {
 		if s.waitForIndex != 0 {
 			s.waitForIndex--
 			s.waitFor = waitForArray[s.waitForIndex]
@@ -89,7 +89,7 @@ func (s *batchSubmitter) advance(n uint32) {
 	s.waitFor = waitForArray[s.waitForIndex]
 }
 
-func newBatchSubmitter(ring *iouring.Ring) *batchSubmitter {
+func newBatchSubmitter(ring *giouring.Ring) *batchSubmitter {
 	submitter := &batchSubmitter{
 		ring:            ring,
 		timeoutTimeSpec: syscall.NsecToTimespec((time.Millisecond).Nanoseconds()),

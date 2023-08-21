@@ -20,10 +20,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	"github.com/pawelgaczynski/gain/logger"
 	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 	"github.com/pawelgaczynski/gain/pkg/socket"
+	"github.com/pawelgaczynski/giouring"
 	"golang.org/x/sys/unix"
 )
 
@@ -35,7 +35,7 @@ type shardWorkerConfig struct {
 type shardWorker struct {
 	*acceptor
 	*readWriteWorkerImpl
-	ring               *iouring.Ring
+	ring               *giouring.Ring
 	connectionManager  *connectionManager
 	cpuAffinity        bool
 	tcpKeepAlive       time.Duration
@@ -43,7 +43,7 @@ type shardWorker struct {
 	accepting          atomic.Bool
 }
 
-func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
+func (w *shardWorker) onAccept(cqe *giouring.CompletionQueueEvent) error {
 	err := w.addAcceptConnRequest()
 	if err != nil {
 		w.accepting.Store(false)
@@ -51,7 +51,7 @@ func (w *shardWorker) onAccept(cqe *iouring.CompletionQueueEvent) error {
 		return fmt.Errorf("add accept() request error: %w", err)
 	}
 
-	fileDescriptor := int(cqe.Res())
+	fileDescriptor := int(cqe.Res)
 	w.logDebug().Int("fd", fileDescriptor).Msg("Connection accepted")
 
 	conn := w.connectionManager.getFd(fileDescriptor)
@@ -93,7 +93,7 @@ func (w *shardWorker) activeConnections() int {
 	return w.connectionManager.activeConnections() - 1
 }
 
-func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueEvent) {
+func (w *shardWorker) handleConn(conn *connection, cqe *giouring.CompletionQueueEvent) {
 	var (
 		err    error
 		errMsg string
@@ -119,9 +119,9 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 			break
 		}
 
-		n := int(cqe.Res())
+		n := int(cqe.Res)
 		conn.onKernelWrite(n)
-		w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+		w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res).Msg("Bytes writed")
 
 		conn.setUserSpace()
 		w.eventHandler.OnWrite(conn, n)
@@ -138,12 +138,12 @@ func (w *shardWorker) handleConn(conn *connection, cqe *iouring.CompletionQueueE
 		}
 
 	case connClose:
-		if cqe.UserData()&closeConnFlag > 0 {
+		if cqe.UserData&closeConnFlag > 0 {
 			w.closeConn(conn, false, nil)
-		} else if cqe.UserData()&writeDataFlag > 0 {
-			n := int(cqe.Res())
+		} else if cqe.UserData&writeDataFlag > 0 {
+			n := int(cqe.Res)
 			conn.onKernelWrite(n)
-			w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes writed")
+			w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res).Msg("Bytes writed")
 			conn.setUserSpace()
 			w.eventHandler.OnWrite(conn, n)
 		}
@@ -208,9 +208,9 @@ func (w *shardWorker) loop(fd int) error {
 	w.fd = fd
 	w.initLoop()
 
-	loopErr := w.startLoop(w.index(), func(cqe *iouring.CompletionQueueEvent) error {
-		if exit := w.processEvent(cqe, func(cqe *iouring.CompletionQueueEvent) bool {
-			keyOrFd := cqe.UserData() & ^allFlagsMask
+	loopErr := w.startLoop(w.index(), func(cqe *giouring.CompletionQueueEvent) error {
+		if exit := w.processEvent(cqe, func(cqe *giouring.CompletionQueueEvent) bool {
+			keyOrFd := cqe.UserData & ^allFlagsMask
 			if acceptReqFailedAfterStop := keyOrFd == uint64(w.fd) &&
 				!w.accepting.Load(); acceptReqFailedAfterStop {
 				return true
@@ -220,7 +220,7 @@ func (w *shardWorker) loop(fd int) error {
 		}); exit {
 			return nil
 		}
-		key := int(cqe.UserData() & ^allFlagsMask)
+		key := int(cqe.UserData & ^allFlagsMask)
 		var connFd int
 		if w.connectionProtocol {
 			connFd = key
@@ -254,7 +254,7 @@ func (w *shardWorker) closeAllConnsAndRings() {
 func newShardWorker(
 	index int, localAddr net.Addr, config shardWorkerConfig, eventHandler EventHandler,
 ) (*shardWorker, error) {
-	ring, err := iouring.CreateRing(config.maxSQEntries)
+	ring, err := giouring.CreateRing(uint32(config.maxSQEntries))
 	if err != nil {
 		return nil, fmt.Errorf("creating ring error: %w", err)
 	}
