@@ -15,17 +15,17 @@
 package gain
 
 import (
-	"fmt"
 	"net"
 	"syscall"
 	"unsafe"
 
-	"github.com/pawelgaczynski/gain/iouring"
+	"github.com/pawelgaczynski/gain/pkg/errors"
 	"github.com/pawelgaczynski/gain/pkg/socket"
+	"github.com/pawelgaczynski/giouring"
 )
 
 type acceptor struct {
-	ring              *iouring.Ring
+	ring              *giouring.Ring
 	fd                int
 	clientAddr        *syscall.RawSockaddrAny
 	clientLenPointer  *uint32
@@ -33,9 +33,9 @@ type acceptor struct {
 }
 
 func (a *acceptor) addAcceptRequest() error {
-	entry, err := a.ring.GetSQE()
-	if err != nil {
-		return fmt.Errorf("error getting SQE: %w", err)
+	entry := a.ring.GetSQE()
+	if entry == nil {
+		return errors.ErrGettingSQE
 	}
 
 	entry.PrepareAccept(
@@ -66,7 +66,7 @@ func (a *acceptor) lastClientAddr() (net.Addr, error) {
 	return socket.SockaddrToTCPOrUnixAddr(addr), nil
 }
 
-func newAcceptor(ring *iouring.Ring, connectionManager *connectionManager) *acceptor {
+func newAcceptor(ring *giouring.Ring, connectionManager *connectionManager) *acceptor {
 	acceptor := &acceptor{
 		ring:              ring,
 		connectionManager: connectionManager,

@@ -24,8 +24,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
+	"github.com/pawelgaczynski/giouring"
 	. "github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
@@ -43,25 +43,25 @@ type conn struct {
 	state          int
 }
 
-func loop(t *testing.T, ring *iouring.Ring, socketFd int, connection *conn, testCase *testCase) bool {
+func loop(t *testing.T, ring *giouring.Ring, socketFd int, connection *conn, testCase *testCase) bool {
 	t.Helper()
 
 	cqe, err := ring.WaitCQE()
-	if errors.Is(err, iouring.ErrAgain) || errors.Is(err, iouring.ErrInterrupredSyscall) ||
-		errors.Is(err, iouring.ErrTimerExpired) {
+	if errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EINTR) ||
+		errors.Is(err, syscall.ETIME) {
 		return false
 	}
 
 	Nil(t, err)
-	entry, err := ring.GetSQE()
-	Nil(t, err)
+	entry := ring.GetSQE()
+	NotNil(t, entry)
 	ring.CQESeen(cqe)
 
 	switch connection.state {
 	case accept:
-		Equal(t, uint64(socketFd), cqe.UserData())
-		Greater(t, cqe.Res(), int32(0))
-		connection.fd = uint64(cqe.Res())
+		Equal(t, uint64(socketFd), cqe.UserData)
+		Greater(t, cqe.Res, int32(0))
+		connection.fd = uint64(cqe.Res)
 		entry.PrepareRecv(
 			int(connection.fd),
 			uintptr(connection.inboundBuffer.WriteAddress()),
@@ -79,17 +79,17 @@ func loop(t *testing.T, ring *iouring.Ring, socketFd int, connection *conn, test
 		}
 		testCase.recvIdx++
 
-		Equal(t, connection.fd, cqe.UserData())
-		Equal(t, int32(len(data)), cqe.Res())
+		Equal(t, connection.fd, cqe.UserData)
+		Equal(t, int32(len(data)), cqe.Res)
 
-		connection.inboundBuffer.AdvanceWrite(int(cqe.Res()))
+		connection.inboundBuffer.AdvanceWrite(int(cqe.Res))
 		readBuf := make([]byte, DefaultMagicBufferSize)
 
 		var bytesRead int
 		bytesRead, err = connection.inboundBuffer.Read(readBuf)
 		Nil(t, err)
 		Equal(t, len(data), bytesRead)
-		Equal(t, data, readBuf[:cqe.Res()])
+		Equal(t, data, readBuf[:cqe.Res])
 
 		var bytesWritten int
 		bytesWritten, err = connection.outboundBuffer.Write(data)
@@ -112,10 +112,10 @@ func loop(t *testing.T, ring *iouring.Ring, socketFd int, connection *conn, test
 			res = int32(DefaultMagicBufferSize)
 		}
 
-		Equal(t, connection.fd, cqe.UserData())
-		Equal(t, res, cqe.Res())
+		Equal(t, connection.fd, cqe.UserData)
+		Equal(t, res, cqe.Res)
 
-		connection.outboundBuffer.AdvanceRead(int(cqe.Res()))
+		connection.outboundBuffer.AdvanceRead(int(cqe.Res))
 
 		if testCase.sendIdx == 0 {
 			entry.PrepareRecv(
@@ -148,12 +148,10 @@ type testCase struct {
 }
 
 func TestMagicRingRecvSend(t *testing.T) {
-	ring, err := iouring.CreateRing(16)
+	ring, err := giouring.CreateRing(16)
 	Nil(t, err)
 
-	defer func() {
-		_ = ring.QueueExit()
-	}()
+	defer ring.QueueExit()
 
 	socketFd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	Nil(t, err)
@@ -173,8 +171,8 @@ func TestMagicRingRecvSend(t *testing.T) {
 		Nil(t, closeErr)
 	}()
 
-	entry, err := ring.GetSQE()
-	Nil(t, err)
+	entry := ring.GetSQE()
+	NotNil(t, entry)
 	clientLen := new(uint32)
 	clientAddr := &unix.RawSockaddrAny{}
 	*clientLen = unix.SizeofSockaddrAny

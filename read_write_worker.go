@@ -20,8 +20,8 @@ import (
 	"net"
 
 	"github.com/alitto/pond"
-	"github.com/pawelgaczynski/gain/iouring"
 	"github.com/pawelgaczynski/gain/pkg/queue"
+	"github.com/pawelgaczynski/giouring"
 	"github.com/rs/zerolog"
 )
 
@@ -41,7 +41,7 @@ type readWriteWorkerImpl struct {
 	*workerImpl
 	*writer
 	*reader
-	ring              *iouring.Ring
+	ring              *giouring.Ring
 	connectionManager *connectionManager
 	asyncOpQueue      queue.LockFreeQueue[*connection]
 	pool              *pond.WorkerPool
@@ -150,7 +150,7 @@ func (w *readWriteWorkerImpl) writeData(conn *connection) error {
 	return nil
 }
 
-func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *connection) error {
+func (w *readWriteWorkerImpl) onRead(cqe *giouring.CompletionQueueEvent, conn *connection) error {
 	// https://manpages.debian.org/unstable/manpages-dev/recv.2.en.html
 	// These calls return the number of bytes received, or -1 if an error occurred.
 	// In the event of an error, errno is set to indicate the error.
@@ -159,15 +159,15 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 	// Datagram sockets in various domains (e.g., the UNIX and Internet domains) permit zero-length datagrams.
 	// When such a datagram is received, the return value is 0.
 	// The value 0 may also be returned if the requested number of bytes to receive from a stream socket was 0.
-	if cqe.Res() <= 0 {
+	if cqe.Res <= 0 {
 		w.closeConn(conn, true, io.EOF)
 
 		return nil
 	}
 
-	w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res()).Msg("Bytes read")
+	w.logDebug().Int("fd", conn.fd).Int32("count", cqe.Res).Msg("Bytes read")
 
-	n := int(cqe.Res())
+	n := int(cqe.Res)
 	conn.onKernelRead(n)
 
 	if w.sendRecvMsg {
@@ -182,7 +182,7 @@ func (w *readWriteWorkerImpl) onRead(cqe *iouring.CompletionQueueEvent, conn *co
 		conn = forkedConn
 	}
 
-	if cqe.Flags()&iouring.CQEFSockNonempty > 0 && !conn.isClosed() {
+	if cqe.Flags&giouring.CQEFSockNonempty > 0 && !conn.isClosed() {
 		return w.addReadRequest(conn)
 	}
 
@@ -262,7 +262,7 @@ func (w *readWriteWorkerImpl) closeConn(conn *connection, syscallClose bool, err
 	w.connectionManager.release(conn.key)
 }
 
-func newReadWriteWorkerImpl(ring *iouring.Ring, index int, localAddr net.Addr, eventHandler EventHandler,
+func newReadWriteWorkerImpl(ring *giouring.Ring, index int, localAddr net.Addr, eventHandler EventHandler,
 	connectionManager *connectionManager, config readWriteWorkerConfig, logger zerolog.Logger,
 ) *readWriteWorkerImpl {
 	worker := &readWriteWorkerImpl{

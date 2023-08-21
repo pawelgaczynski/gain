@@ -15,20 +15,19 @@
 package gain
 
 import (
-	"fmt"
-
-	"github.com/pawelgaczynski/gain/iouring"
+	"github.com/pawelgaczynski/gain/pkg/errors"
+	"github.com/pawelgaczynski/giouring"
 )
 
 type reader struct {
-	ring    *iouring.Ring
+	ring    *giouring.Ring
 	recvMsg bool
 }
 
 func (r *reader) addReadRequest(conn *connection) error {
-	entry, err := r.ring.GetSQE()
-	if err != nil {
-		return fmt.Errorf("error getting SQE: %w", err)
+	entry := r.ring.GetSQE()
+	if entry == nil {
+		return errors.ErrGettingSQE
 	}
 
 	conn.inboundBuffer.GrowIfUnsufficientFreeSpace()
@@ -51,7 +50,7 @@ func (r *reader) addReadRequest(conn *connection) error {
 	return nil
 }
 
-func newReader(ring *iouring.Ring, recvMsg bool) *reader {
+func newReader(ring *giouring.Ring, recvMsg bool) *reader {
 	return &reader{
 		ring:    ring,
 		recvMsg: recvMsg,

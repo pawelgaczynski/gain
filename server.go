@@ -23,10 +23,10 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/pawelgaczynski/gain/iouring"
 	"github.com/pawelgaczynski/gain/logger"
 	gainErrors "github.com/pawelgaczynski/gain/pkg/errors"
 	gainNet "github.com/pawelgaczynski/gain/pkg/net"
+	"github.com/pawelgaczynski/giouring"
 	"github.com/rs/zerolog"
 )
 
@@ -288,10 +288,12 @@ func (e *engine) start(mainProcess bool, address string) error {
 		features = supportedFeatures{}
 	)
 
-	features.ringsMessaging, err = iouring.IsOpSupported(iouring.OpMsgRing)
+	probe, err := giouring.GetProbe()
 	if err != nil {
-		return fmt.Errorf("isOpSupported error: %w", err)
+		return fmt.Errorf("getProbe err: %w", err)
 	}
+
+	features.ringsMessaging = probe.IsSupported(giouring.OpMsgRing)
 
 	if mainProcess {
 		sigs := make(chan os.Signal, 1)
